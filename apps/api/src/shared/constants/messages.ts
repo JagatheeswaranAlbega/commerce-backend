@@ -1,0 +1,17 @@
+export const ERROR_MESSAGES = {
+  VALIDATION_ERROR: "Request validation failed.",
+  UNAUTHORIZED: "Authentication is required.",
+  FORBIDDEN: "You are not allowed to perform this action.",
+  NOT_FOUND: "The requested resource was not found.",
+  STORE_NOT_FOUND: "Store was not found.",
+  STORE_INACTIVE: "This store is not currently available.",
+  TENANT_ACCESS_DENIED: "Authenticated principal is not authorized for this store.",
+  INVALID_API_KEY: "Publishable API key is missing or invalid.",
+  INVALID_SECRET_KEY: "Secret API key is missing or invalid.",
+  DUPLICATE_RESOURCE: "A resource with the same unique value already exists.",
+  CONFLICT: "The request conflicts with the current resource state.",
+  INSUFFICIENT_STOCK: "There is not enough stock to complete this request.",
+  INVALID_STATE: "The resource is not in a valid state for this operation.",
+  RATE_LIMITED: "Too many requests. Please try again later.",
+  INTERNAL_ERROR: "An unexpected error occurred.",
+} as const;

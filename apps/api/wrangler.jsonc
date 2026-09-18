@@ -1,0 +1,43 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ecommerce-multi-tenancy-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-07",
+  // nodejs_compat keeps Workers APIs aligned with local Postgres/crypto usage.
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true
+  },
+  "r2_buckets": [
+    {
+      "binding": "PRODUCT_MEDIA",
+      "bucket_name": "ecommerce-product-media"
+    }
+  ],
+  // Replace id with a real Hyperdrive config before production deploy.
+  // localConnectionString is a fallback for local Postgres only.
+  // Prefer CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE in `.env`
+  // (same value as DATABASE_URL) so wrangler dev matches migrate/seed.
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "00000000000000000000000000000000",
+      // WSL2 → Windows Postgres host gateway (same as DATABASE_URL / .env Hyperdrive override).
+      "localConnectionString": "postgresql://postgres:postgres@localhost:5432/ecommerce_multi_tenancy"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "INVENTORY",
+        "class_name": "InventoryCoordinator"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1-inventory-do",
+      "new_classes": ["InventoryCoordinator"]
+    }
+  ]
+}

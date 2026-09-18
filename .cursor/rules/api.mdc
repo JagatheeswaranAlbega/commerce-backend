@@ -1,0 +1,61 @@
+---
+description: Hono route structure, middleware, authorization, validation, and response contracts
+globs: apps/api/src/**/*
+alwaysApply: false
+---
+
+# API Rules
+
+## Routes
+
+- `/api/v1/auth/*` — shared authentication.
+- `/api/v1/platform/*` — Platform Super Admin.
+- `/api/v1/admin/*` — Store Admin.
+- `/api/v1/store/*` — headless storefront.
+
+## Middleware Context
+
+Resolve:
+
+- `storeId`
+- `role`
+- `accessType`
+
+Allowed access types:
+
+- `STOREFRONT`
+- `STORE_ADMIN`
+- `PLATFORM_ADMIN`
+- `SECRET_KEY`
+
+## Authorization
+
+- Platform routes require explicit Platform authorization.
+- Admin routes require Store Admin authorization.
+- Store Admin scope comes from authenticated context.
+- Storefront scope comes from publishable-key resolution.
+- Secret-key scope comes from owning API key.
+
+## Validation
+
+Validate bodies, query parameters, and route parameters with Zod.
+
+## Response
+
+Success:
+
+`{ status: "success", message: "<user-friendly summary>", data: ... }`
+
+Error:
+
+`{ status: "error", message: "<reason>", errors?: [{ code, message?, details? }] }`
+
+## Tenant Safety
+
+Every Store Admin/Storefront query must use the resolved store context.
+
+Do not accept arbitrary client `storeId` as authorization.
+
+## Business Logic
+
+Keep business rules in service/domain layers rather than duplicating them across route handlers.

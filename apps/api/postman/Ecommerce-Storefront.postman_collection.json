@@ -1,0 +1,463 @@
+{
+  "info": {
+    "name": "Ecommerce Storefront API",
+    "description": "Headless storefront APIs under /api/v1/store. Requires x-publishable-key.\n\nPut only the raw key in the publishable_key variable: pk_live_ followed by hex, one line, no quotes, no JSON.\nCopy data.rawKey from Platform Admin → Create Key, or data.keys.publishableKey from Create Store. List Keys does not return the full key.\n\nIf Postman says Invalid character in header content [x-publishable-key], the variable still has a newline or pasted JSON — the collection pre-request script strips that.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "function sanitizePublishableKey(raw) {",
+          "  if (raw === undefined || raw === null) return raw;",
+          "  let value = String(raw).replace(/[\\r\\n\\t]/g, '').trim();",
+          "  value = value.replace(/^[\"']|[\"']$/g, '');",
+          "  const match = value.match(/pk_live_[0-9a-fA-F]+/);",
+          "  return match ? match[0] : value;",
+          "}",
+          "const envKey = pm.environment.get('publishable_key');",
+          "const colKey = pm.collectionVariables.get('publishable_key');",
+          "if (envKey) pm.environment.set('publishable_key', sanitizePublishableKey(envKey));",
+          "if (colKey) pm.collectionVariables.set('publishable_key', sanitizePublishableKey(colKey));",
+          "const header = pm.request.headers.get('x-publishable-key');",
+          "if (header && !String(header).includes('{{')) {",
+          "  pm.request.headers.upsert({ key: 'x-publishable-key', value: sanitizePublishableKey(header) });",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8787/api/v1" },
+    { "key": "publishable_key", "value": "pk_live_REPLACE_ME" },
+    { "key": "cart_id", "value": "" },
+    { "key": "item_id", "value": "" },
+    { "key": "variant_id", "value": "" },
+    { "key": "customer_token", "value": "" },
+    { "key": "address_id", "value": "" },
+    { "key": "order_id", "value": "" },
+    { "key": "order_number", "value": "" },
+    { "key": "collection_slug", "value": "featured" },
+    { "key": "media_id", "value": "" },
+    { "key": "discount_code", "value": "SAVE10" }
+  ],
+  "item": [
+    {
+      "name": "Store",
+      "item": [
+        {
+          "name": "Details",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "x-publishable-key", "value": "{{publishable_key}}" }],
+            "url": "{{base_url}}/store/details"
+          }
+        },
+        {
+          "name": "List Products",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "x-publishable-key", "value": "{{publishable_key}}" }],
+            "url": "{{base_url}}/store/products?page=1&pageSize=20",
+            "description": "Each product includes thumbnail { id, altText, src }. Prefer an admin-selected thumbnail when set; otherwise the first gallery image. Load the image at GET {{base_url}}{{thumbnail.src}} (same as /store/media/:id)."
+          }
+        },
+        {
+          "name": "Get Product By Handle",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "x-publishable-key", "value": "{{publishable_key}}" }],
+            "url": "{{base_url}}/store/products/classic-tee",
+            "description": "Returns variants, images[], and thumbnail. images[0] is the main image (explicit thumbnail if set, else first by gallery order); remaining images keep upload order. Use image.src or /store/media/:id to fetch the file."
+          }
+        },
+        {
+          "name": "List Categories",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "x-publishable-key", "value": "{{publishable_key}}" }],
+            "url": "{{base_url}}/store/categories"
+          }
+        },
+        {
+          "name": "Get Category",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "x-publishable-key", "value": "{{publishable_key}}" }],
+            "url": "{{base_url}}/store/categories/apparel"
+          }
+        },
+        {
+          "name": "List Collections",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "x-publishable-key", "value": "{{publishable_key}}" }],
+            "url": "{{base_url}}/store/collections"
+          }
+        },
+        {
+          "name": "Get Collection",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "x-publishable-key", "value": "{{publishable_key}}" }],
+            "url": "{{base_url}}/store/collections/{{collection_slug}}"
+          }
+        },
+        {
+          "name": "Get Media",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "x-publishable-key", "value": "{{publishable_key}}" }],
+            "url": "{{base_url}}/store/media/{{media_id}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cart",
+      "item": [
+        {
+          "name": "Create Cart",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json?.data?.id) pm.collectionVariables.set('cart_id', json.data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "x-publishable-key", "value": "{{publishable_key}}" },
+              { "key": "Authorization", "value": "Bearer {{customer_token}}", "disabled": true }
+            ],
+            "url": "{{base_url}}/store/carts"
+          }
+        },
+        {
+          "name": "Get Cart",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "x-publishable-key", "value": "{{publishable_key}}" }],
+            "url": "{{base_url}}/store/carts/{{cart_id}}"
+          }
+        },
+        {
+          "name": "Attach Customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "x-publishable-key", "value": "{{publishable_key}}" },
+              { "key": "Authorization", "value": "Bearer {{customer_token}}" }
+            ],
+            "url": "{{base_url}}/store/carts/{{cart_id}}/customer"
+          }
+        },
+        {
+          "name": "Add Item",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "x-publishable-key", "value": "{{publishable_key}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"variantId\": \"{{variant_id}}\",\n  \"quantity\": 1\n}"
+            },
+            "url": "{{base_url}}/store/carts/{{cart_id}}/items"
+          }
+        },
+        {
+          "name": "Update Item",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "x-publishable-key", "value": "{{publishable_key}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 2\n}"
+            },
+            "url": "{{base_url}}/store/carts/{{cart_id}}/items/{{item_id}}"
+          }
+        },
+        {
+          "name": "Remove Item",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "x-publishable-key", "value": "{{publishable_key}}" }],
+            "url": "{{base_url}}/store/carts/{{cart_id}}/items/{{item_id}}"
+          }
+        },
+        {
+          "name": "Apply Discount",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "x-publishable-key", "value": "{{publishable_key}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{discount_code}}\"\n}"
+            },
+            "url": "{{base_url}}/store/carts/{{cart_id}}/discount"
+          }
+        },
+        {
+          "name": "Clear Discount",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "x-publishable-key", "value": "{{publishable_key}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": null\n}"
+            },
+            "url": "{{base_url}}/store/carts/{{cart_id}}/discount"
+          }
+        },
+        {
+          "name": "Set Shipping Address",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "x-publishable-key", "value": "{{publishable_key}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Customer Name\",\n  \"phone\": \"9999999999\",\n  \"addressLine1\": \"12 MG Road\",\n  \"city\": \"Bengaluru\",\n  \"state\": \"KA\",\n  \"postalCode\": \"560001\",\n  \"country\": \"IN\"\n}"
+            },
+            "url": "{{base_url}}/store/carts/{{cart_id}}/shipping-address"
+          }
+        },
+        {
+          "name": "Apply Saved Address",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "x-publishable-key", "value": "{{publishable_key}}" },
+              { "key": "Authorization", "value": "Bearer {{customer_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"addressId\": \"{{address_id}}\"\n}"
+            },
+            "url": "{{base_url}}/store/carts/{{cart_id}}/shipping-address/from-saved"
+          }
+        },
+        {
+          "name": "Set Cart Email",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "x-publishable-key", "value": "{{publishable_key}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"customer@example.com\"\n}"
+            },
+            "url": "{{base_url}}/store/carts/{{cart_id}}/email"
+          }
+        },
+        {
+          "name": "Checkout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "x-publishable-key", "value": "{{publishable_key}}" },
+              { "key": "Authorization", "value": "Bearer {{customer_token}}", "disabled": true },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "checkout-{{$guid}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"discountCode\": \"{{discount_code}}\"\n}"
+            },
+            "url": "{{base_url}}/store/carts/{{cart_id}}/checkout"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Customer Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "x-publishable-key", "value": "{{publishable_key}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"customer@example.com\",\n  \"password\": \"Customer@123\",\n  \"name\": \"Test Customer\"\n}"
+            },
+            "url": "{{base_url}}/store/auth/register"
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json?.data?.accessToken) pm.collectionVariables.set('customer_token', json.data.accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "x-publishable-key", "value": "{{publishable_key}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"customer@example.com\",\n  \"password\": \"Customer@123\"\n}"
+            },
+            "url": "{{base_url}}/store/auth/login"
+          }
+        },
+        {
+          "name": "Me",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "x-publishable-key", "value": "{{publishable_key}}" },
+              { "key": "Authorization", "value": "Bearer {{customer_token}}" }
+            ],
+            "url": "{{base_url}}/store/auth/me"
+          }
+        },
+        {
+          "name": "My Orders",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "x-publishable-key", "value": "{{publishable_key}}" },
+              { "key": "Authorization", "value": "Bearer {{customer_token}}" }
+            ],
+            "url": "{{base_url}}/store/orders"
+          }
+        },
+        {
+          "name": "Lookup Order",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "x-publishable-key", "value": "{{publishable_key}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/store/orders/lookup?orderNumber={{order_number}}&email=customer@example.com",
+              "host": ["{{base_url}}"],
+              "path": ["store", "orders", "lookup"],
+              "query": [
+                { "key": "orderNumber", "value": "{{order_number}}" },
+                { "key": "email", "value": "customer@example.com" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get My Order",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "x-publishable-key", "value": "{{publishable_key}}" },
+              { "key": "Authorization", "value": "Bearer {{customer_token}}" }
+            ],
+            "url": "{{base_url}}/store/orders/{{order_id}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Addresses",
+      "item": [
+        {
+          "name": "List Addresses",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "x-publishable-key", "value": "{{publishable_key}}" },
+              { "key": "Authorization", "value": "Bearer {{customer_token}}" }
+            ],
+            "url": "{{base_url}}/store/addresses"
+          }
+        },
+        {
+          "name": "Create Address",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json?.data?.id) pm.collectionVariables.set('address_id', json.data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "x-publishable-key", "value": "{{publishable_key}}" },
+              { "key": "Authorization", "value": "Bearer {{customer_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Customer\",\n  \"phone\": \"9999999999\",\n  \"addressLine1\": \"12 MG Road\",\n  \"city\": \"Bengaluru\",\n  \"state\": \"KA\",\n  \"postalCode\": \"560001\",\n  \"country\": \"IN\",\n  \"isDefault\": true\n}"
+            },
+            "url": "{{base_url}}/store/addresses"
+          }
+        },
+        {
+          "name": "Update Address",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "x-publishable-key", "value": "{{publishable_key}}" },
+              { "key": "Authorization", "value": "Bearer {{customer_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"addressLine1\": \"14 MG Road\",\n  \"isDefault\": true\n}"
+            },
+            "url": "{{base_url}}/store/addresses/{{address_id}}"
+          }
+        },
+        {
+          "name": "Delete Address",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "x-publishable-key", "value": "{{publishable_key}}" },
+              { "key": "Authorization", "value": "Bearer {{customer_token}}" }
+            ],
+            "url": "{{base_url}}/store/addresses/{{address_id}}"
+          }
+        }
+      ]
+    }
+  ]
+}

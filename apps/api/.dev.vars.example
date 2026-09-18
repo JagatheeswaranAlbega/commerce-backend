@@ -1,0 +1,4 @@
+ENVIRONMENT=development
+DATABASE_URL="postgresql://postgres:admin@localhost:5432/ecommerce_multi_tenancy"
+JWT_SECRET=replace-with-a-development-secret-at-least-32-chars
+FRONTEND_URL=http://localhost:3000

@@ -1,0 +1,8 @@
+node_modules
+.wrangler
+coverage
+package-lock.json
+api/.wrangler
+api/coverage
+api/dist
+api/drizzle/meta

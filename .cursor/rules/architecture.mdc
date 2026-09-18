@@ -1,0 +1,53 @@
+---
+description: Global architecture, multi-tenancy, authentication boundaries, and system invariants
+globs: **/*
+alwaysApply: true
+---
+
+# Architecture Rules
+
+## Stack
+
+- Turborepo monorepo.
+- `apps/api`: Hono + TypeScript on Cloudflare Workers.
+- PostgreSQL through Cloudflare Hyperdrive.
+- Drizzle ORM and Drizzle Kit.
+- Cloudflare R2 for media.
+- `apps/web`: Next.js App Router, Tailwind, Shadcn UI, TanStack Query/Table.
+- Vitest for API testing.
+
+## Tenancy
+
+- One shared backend serves many stores.
+- Tenant-owned commerce records contain non-nullable `store_id`.
+- Store Admin and Storefront operations must be scoped to the resolved store.
+- Never trust a client-provided store ID for authorization.
+- Use application-level tenant isolation unless PostgreSQL RLS is actually implemented.
+
+## Authentication
+
+- One `/login` for Platform Super Admin and Store Admin.
+- JWT contains user identity, role, and store scope.
+- Platform role: `PLATFORM_SUPER_ADMIN`, storeId null.
+- Store role: `STORE_ADMIN`, fixed storeId.
+- Storefront uses `x-publishable-key`.
+- Server integrations may use `sk_live_...`.
+
+## Secrets
+
+- Never persist raw secret keys.
+- Persist SHA-256 hash.
+- Never log passwords, raw secret keys, or full Authorization headers.
+
+## Money
+
+- INR only.
+- All money is integer paise.
+- No floating-point money.
+
+## Security
+
+- Backend authorization is mandatory.
+- UI hiding is not authorization.
+- Never allow `storeId = null` to implicitly mean global access.
+- Platform global access requires explicit platform authorization.

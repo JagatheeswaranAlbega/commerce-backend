@@ -1,0 +1,46 @@
+{
+  "name": "api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "wrangler dev",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run src/**/*.test.ts",
+    "test:integration": "vitest run --passWithNoTests src/**/*.integration.test.ts",
+    "test:security": "vitest run src/modules/security",
+    "test:watch": "vitest",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "db:seed": "tsx src/db/seed.cli.ts",
+    "deploy": "wrangler deploy",
+    "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.9.7",
+    "jose": "^6.2.12",
+    "postgres": "^3.4.9",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.35.0",
+    "@types/node": "^20",
+    "dotenv": "^16.6.1",
+    "drizzle-kit": "^0.31.10",
+    "eslint": "^9",
+    "eslint-config-prettier": "^10.1.8",
+    "tsx": "^4.23.13",
+    "typescript": "^5",
+    "typescript-eslint": "^8.43.0",
+    "vitest": "^3.2.4",
+    "wrangler": "latest"
+  }
+}

@@ -1,0 +1,20 @@
+---
+description: PostgreSQL and Drizzle schema, tenant isolation, indexing, and migration rules
+globs: apps/api/src/db/**/*
+alwaysApply: false
+---
+
+# Database Rules
+
+- Every tenant-owned commerce table must contain non-nullable `store_id`.
+- `store_id` references `stores.id`.
+- Add indexes supporting `(store_id, id)` and relevant `(store_id, handle)` / `(store_id, sku)` access patterns.
+- Use tenant-scoped uniqueness where required.
+- Store all money as integer paise.
+- Never use floating-point columns for money.
+- Prefer UUID/CUID2 identifiers consistently.
+- Keep schemas modular under `apps/api/src/db/schema/`.
+- Never update/delete a Store Admin resource by resource ID alone.
+- Safe operations require both resource ID and authenticated store ID.
+- Migrations must be reviewed and tested before deployment.
+- Use transactions for checkout/order/inventory operations that must be atomic.
