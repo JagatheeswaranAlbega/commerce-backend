@@ -7,6 +7,7 @@ import { hashPassword, verifyPassword } from "@/infrastructure/crypto/password";
 import { USER_ROLES, type AdminJwtPayload } from "@/modules/auth/auth.types";
 import { signAuthToken } from "@/modules/auth/jwt";
 import { UnauthorizedError, ValidationError } from "@/shared/errors/app-error";
+import { postgresErrorFields } from "@/shared/logging/postgres-error";
 import { normalizeEmail } from "@/shared/tenant/normalize";
 
 const ACCESS_TTL_SECONDS = 60 * 60 * 24;
@@ -59,9 +60,23 @@ export class AuthService {
 
   async login(email: string, password: string) {
     const normalized = normalizeEmail(email);
-    const user = await this.db.query.users.findFirst({
-      where: eq(users.email, normalized),
-    });
+    let user: typeof users.$inferSelect | undefined;
+    try {
+      user = await this.db.query.users.findFirst({
+        where: eq(users.email, normalized),
+      });
+    } catch (error) {
+      const pg = postgresErrorFields(error);
+      console.error("auth.login users query failed:", {
+        message: pg.message,
+        code: pg.code,
+        detail: pg.detail,
+        hint: pg.hint,
+        severity: pg.severity,
+        causeMessage: pg.causeMessage,
+      });
+      throw error;
+    }
 
     if (!user || !user.isActive) {
       throw new UnauthorizedError("Invalid email or password.");

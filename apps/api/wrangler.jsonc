@@ -18,6 +18,7 @@
   // localConnectionString is a fallback for local Postgres only.
   // Prefer CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE in `.env`
   // (same value as DATABASE_URL) so wrangler dev matches migrate/seed.
+  // For Neon: use the DIRECT (non-pooler) connection string — Hyperdrive pools.
   "hyperdrive": [
     {
       "binding": "HYPERDRIVE",
