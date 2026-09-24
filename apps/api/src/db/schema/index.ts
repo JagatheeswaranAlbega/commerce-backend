@@ -9,10 +9,12 @@ import { collections } from "./collections";
 import { customerAddresses } from "./customer-addresses";
 import { customers } from "./customers";
 import { discounts } from "./discounts";
+import { wishlistItems } from "./wishlist-items";
 import {
   apiKeyStatusEnum,
   apiKeyTypeEnum,
   cartStatusEnum,
+  catalogItemSourceEnum,
   categoryStatusEnum,
   collectionStatusEnum,
   discountStatusEnum,
@@ -25,6 +27,10 @@ import {
   userRoleEnum,
   variantStatusEnum,
 } from "./enums";
+import { globalCategories } from "./global-categories";
+import { globalProductImages } from "./global-product-images";
+import { globalProductVariants } from "./global-product-variants";
+import { globalProducts } from "./global-products";
 import { inventory } from "./inventory";
 import { inventoryMovements } from "./inventory-movements";
 import { orderItems } from "./order-items";
@@ -35,6 +41,7 @@ import { productImages } from "./product-images";
 import { productVariants } from "./product-variants";
 import { products } from "./products";
 import { refreshTokens } from "./refresh-tokens";
+import { storeGlobalProducts } from "./store-global-products";
 import { storeSettings } from "./store-settings";
 import { stores } from "./stores";
 import { users } from "./users";
@@ -51,6 +58,8 @@ export const storesRelations = relations(stores, ({ many }) => ({
   orders: many(orders),
   orderReturns: many(orderReturns),
   discounts: many(discounts),
+  wishlistItems: many(wishlistItems),
+  storeGlobalProducts: many(storeGlobalProducts),
 }));
 
 export const usersRelations = relations(users, ({ one, many }) => ({
@@ -96,6 +105,16 @@ export const categoriesRelations = relations(categories, ({ one, many }) => ({
   products: many(products),
 }));
 
+export const globalCategoriesRelations = relations(globalCategories, ({ one, many }) => ({
+  parent: one(globalCategories, {
+    fields: [globalCategories.parentId],
+    references: [globalCategories.id],
+    relationName: "global_category_parent",
+  }),
+  children: many(globalCategories, { relationName: "global_category_parent" }),
+  products: many(globalProducts),
+}));
+
 export const collectionsRelations = relations(collections, ({ one, many }) => ({
   store: one(stores, {
     fields: [collections.storeId],
@@ -133,7 +152,42 @@ export const productsRelations = relations(products, ({ one, many }) => ({
   collections: many(collectionProducts),
 }));
 
-export const productVariantsRelations = relations(productVariants, ({ one }) => ({
+export const globalProductsRelations = relations(globalProducts, ({ one, many }) => ({
+  category: one(globalCategories, {
+    fields: [globalProducts.categoryId],
+    references: [globalCategories.id],
+  }),
+  variants: many(globalProductVariants),
+  images: many(globalProductImages),
+  storeImports: many(storeGlobalProducts),
+}));
+
+export const globalProductVariantsRelations = relations(globalProductVariants, ({ one }) => ({
+  product: one(globalProducts, {
+    fields: [globalProductVariants.productId],
+    references: [globalProducts.id],
+  }),
+}));
+
+export const globalProductImagesRelations = relations(globalProductImages, ({ one }) => ({
+  product: one(globalProducts, {
+    fields: [globalProductImages.productId],
+    references: [globalProducts.id],
+  }),
+}));
+
+export const storeGlobalProductsRelations = relations(storeGlobalProducts, ({ one }) => ({
+  store: one(stores, {
+    fields: [storeGlobalProducts.storeId],
+    references: [stores.id],
+  }),
+  globalProduct: one(globalProducts, {
+    fields: [storeGlobalProducts.globalProductId],
+    references: [globalProducts.id],
+  }),
+}));
+
+export const productVariantsRelations = relations(productVariants, ({ one, many }) => ({
   store: one(stores, {
     fields: [productVariants.storeId],
     references: [stores.id],
@@ -142,10 +196,7 @@ export const productVariantsRelations = relations(productVariants, ({ one }) => 
     fields: [productVariants.productId],
     references: [products.id],
   }),
-  inventory: one(inventory, {
-    fields: [productVariants.id],
-    references: [inventory.variantId],
-  }),
+  wishlistItems: many(wishlistItems),
 }));
 
 export const productImagesRelations = relations(productImages, ({ one }) => ({
@@ -165,6 +216,7 @@ export const customersRelations = relations(customers, ({ one, many }) => ({
     references: [stores.id],
   }),
   addresses: many(customerAddresses),
+  wishlistItems: many(wishlistItems),
   carts: many(carts),
   orders: many(orders),
   orderReturns: many(orderReturns),
@@ -177,6 +229,17 @@ export const customerAddressesRelations = relations(customerAddresses, ({ one })
   }),
   customer: one(customers, {
     fields: [customerAddresses.customerId],
+    references: [customers.id],
+  }),
+}));
+
+export const wishlistItemsRelations = relations(wishlistItems, ({ one }) => ({
+  store: one(stores, {
+    fields: [wishlistItems.storeId],
+    references: [stores.id],
+  }),
+  customer: one(customers, {
+    fields: [wishlistItems.customerId],
     references: [customers.id],
   }),
 }));
@@ -201,10 +264,6 @@ export const cartLineItemsRelations = relations(cartLineItems, ({ one }) => ({
   cart: one(carts, {
     fields: [cartLineItems.cartId],
     references: [carts.id],
-  }),
-  variant: one(productVariants, {
-    fields: [cartLineItems.variantId],
-    references: [productVariants.id],
   }),
 }));
 
@@ -245,14 +304,6 @@ export const orderItemsRelations = relations(orderItems, ({ one }) => ({
     fields: [orderItems.orderId],
     references: [orders.id],
   }),
-  product: one(products, {
-    fields: [orderItems.productId],
-    references: [products.id],
-  }),
-  variant: one(productVariants, {
-    fields: [orderItems.variantId],
-    references: [productVariants.id],
-  }),
 }));
 
 export const inventoryRelations = relations(inventory, ({ one }) => ({
@@ -260,20 +311,12 @@ export const inventoryRelations = relations(inventory, ({ one }) => ({
     fields: [inventory.storeId],
     references: [stores.id],
   }),
-  variant: one(productVariants, {
-    fields: [inventory.variantId],
-    references: [productVariants.id],
-  }),
 }));
 
 export const inventoryMovementsRelations = relations(inventoryMovements, ({ one }) => ({
   store: one(stores, {
     fields: [inventoryMovements.storeId],
     references: [stores.id],
-  }),
-  variant: one(productVariants, {
-    fields: [inventoryMovements.variantId],
-    references: [productVariants.id],
   }),
 }));
 
@@ -303,13 +346,19 @@ export const schema = {
   storeSettings,
   platformSettings,
   categories,
+  globalCategories,
   collections,
   collectionProducts,
   products,
+  globalProducts,
   productVariants,
+  globalProductVariants,
   productImages,
+  globalProductImages,
+  storeGlobalProducts,
   customers,
   customerAddresses,
+  wishlistItems,
   carts,
   cartLineItems,
   orders,
@@ -325,13 +374,19 @@ export const schema = {
   refreshTokensRelations,
   storeSettingsRelations,
   categoriesRelations,
+  globalCategoriesRelations,
   collectionsRelations,
   collectionProductsRelations,
   productsRelations,
+  globalProductsRelations,
   productVariantsRelations,
+  globalProductVariantsRelations,
   productImagesRelations,
+  globalProductImagesRelations,
+  storeGlobalProductsRelations,
   customersRelations,
   customerAddressesRelations,
+  wishlistItemsRelations,
   cartsRelations,
   cartLineItemsRelations,
   ordersRelations,
@@ -351,6 +406,7 @@ export {
   cartLineItems,
   carts,
   cartStatusEnum,
+  catalogItemSourceEnum,
   categories,
   categoryStatusEnum,
   collectionProducts,
@@ -359,8 +415,13 @@ export {
   customerAddresses,
   customers,
   discounts,
+  wishlistItems,
   discountStatusEnum,
   discountTypeEnum,
+  globalCategories,
+  globalProductImages,
+  globalProductVariants,
+  globalProducts,
   inventory,
   inventoryMovementTypeEnum,
   inventoryMovements,
@@ -375,6 +436,7 @@ export {
   productVariants,
   products,
   refreshTokens,
+  storeGlobalProducts,
   storeSettings,
   stores,
   storeStatusEnum,

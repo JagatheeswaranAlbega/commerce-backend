@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { Eye, EyeOff } from "lucide-react"
 import { z } from "zod"
 import { cn } from "cn"
 
@@ -38,6 +39,7 @@ export function LoginForm({
     password?: string
   }>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -95,7 +97,7 @@ export function LoginForm({
                   id="email"
                   name="email"
                   type="email"
-                  placeholder="admin@example.com"
+                  placeholder="admin@alora.com"
                   autoComplete="email"
                   required
                   disabled={isSubmitting}
@@ -106,14 +108,32 @@ export function LoginForm({
               </Field>
               <Field data-invalid={fieldErrors.password ? true : undefined}>
                 <FieldLabel htmlFor="password">Password</FieldLabel>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  disabled={isSubmitting}
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    required
+                    disabled={isSubmitting}
+                    className="pr-9 [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 z-10 flex w-9 items-center justify-center text-muted-foreground transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
+                    onClick={() => setShowPassword((visible) => !visible)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-pressed={showPassword}
+                    aria-controls="password"
+                    disabled={isSubmitting}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="pointer-events-none size-4" />
+                    ) : (
+                      <Eye className="pointer-events-none size-4" />
+                    )}
+                  </button>
+                </div>
                 {fieldErrors.password ? (
                   <FieldError>{fieldErrors.password}</FieldError>
                 ) : null}

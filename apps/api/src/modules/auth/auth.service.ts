@@ -1,13 +1,13 @@
 import { and, eq, isNull } from "drizzle-orm";
 import type { Database } from "@/db/client";
 import { refreshTokens } from "@/db/schema/refresh-tokens";
+import { stores } from "@/db/schema/stores";
 import { users } from "@/db/schema/users";
 import { sha256Hex } from "@/infrastructure/crypto/api-key";
 import { hashPassword, verifyPassword } from "@/infrastructure/crypto/password";
 import { USER_ROLES, type AdminJwtPayload } from "@/modules/auth/auth.types";
 import { signAuthToken } from "@/modules/auth/jwt";
 import { UnauthorizedError, ValidationError } from "@/shared/errors/app-error";
-import { postgresErrorFields } from "@/shared/logging/postgres-error";
 import { normalizeEmail } from "@/shared/tenant/normalize";
 
 const ACCESS_TTL_SECONDS = 60 * 60 * 24;
@@ -20,6 +20,22 @@ function toPublicUser(user: typeof users.$inferSelect) {
     role: user.role,
     storeId: user.storeId,
   };
+}
+
+async function assertStoreAdminStoreActive(
+  db: Database,
+  user: typeof users.$inferSelect,
+) {
+  if (user.role !== USER_ROLES.STORE_ADMIN) return;
+  if (!user.storeId) {
+    throw new UnauthorizedError("Store admin is missing store scope.");
+  }
+  const store = await db.query.stores.findFirst({
+    where: eq(stores.id, user.storeId),
+  });
+  if (!store || store.status !== "ACTIVE") {
+    throw new UnauthorizedError("This store has been deactivated.");
+  }
 }
 
 async function issueTokens(db: Database, user: typeof users.$inferSelect, jwtSecret: string) {
@@ -60,23 +76,9 @@ export class AuthService {
 
   async login(email: string, password: string) {
     const normalized = normalizeEmail(email);
-    let user: typeof users.$inferSelect | undefined;
-    try {
-      user = await this.db.query.users.findFirst({
-        where: eq(users.email, normalized),
-      });
-    } catch (error) {
-      const pg = postgresErrorFields(error);
-      console.error("auth.login users query failed:", {
-        message: pg.message,
-        code: pg.code,
-        detail: pg.detail,
-        hint: pg.hint,
-        severity: pg.severity,
-        causeMessage: pg.causeMessage,
-      });
-      throw error;
-    }
+    const user = await this.db.query.users.findFirst({
+      where: eq(users.email, normalized),
+    });
 
     if (!user || !user.isActive) {
       throw new UnauthorizedError("Invalid email or password.");
@@ -94,6 +96,8 @@ export class AuthService {
       throw new UnauthorizedError("Platform admin must not be store-scoped.");
     }
 
+    await assertStoreAdminStoreActive(this.db, user);
+
     return issueTokens(this.db, user, this.jwtSecret);
   }
 
@@ -104,6 +108,7 @@ export class AuthService {
     if (!user || !user.isActive) {
       throw new UnauthorizedError();
     }
+    await assertStoreAdminStoreActive(this.db, user);
     return toPublicUser(user);
   }
 
@@ -128,6 +133,8 @@ export class AuthService {
     if (!user || !user.isActive) {
       throw new UnauthorizedError();
     }
+
+    await assertStoreAdminStoreActive(this.db, user);
 
     return issueTokens(this.db, user, this.jwtSecret);
   }

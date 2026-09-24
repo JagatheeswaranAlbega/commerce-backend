@@ -948,6 +948,99 @@ Same fields as shipping address, plus optional `isDefault` (boolean). Setting `i
 
 ---
 
+## Wishlist
+
+Requires customer JWT. Items are keyed by `variantId` (same as cart lines). Duplicate adds are idempotent (returns the existing row).
+
+### Wishlist item shape
+
+```ts
+{
+  id: string;
+  storeId: string;
+  customerId: string;
+  variantId: string;
+  createdAt: string;
+  updatedAt: string;
+  variant: {
+    id: string;
+    productId: string;
+    sku: string;
+    title: string;
+    pricePaise: number;
+    compareAtPricePaise: number | null;
+    status: string;
+    availableQuantity: number;
+  } | null;
+  product: {
+    id: string;
+    title: string;
+    handle: string;
+    status: string;
+  } | null;
+}
+```
+
+List responses include `variant` + `product`. Create responses return the wishlist row only.
+
+### GET `/store/wishlist`
+
+**Headers:** `x-publishable-key`, `Authorization: Bearer <customer_token>`
+
+**Response `data`:** Wishlist item[] (newest first, with variant/product)
+
+---
+
+### POST `/store/wishlist`
+
+**Headers:** `x-publishable-key`, `Authorization: Bearer <customer_token>`
+
+**Request body:**
+
+```json
+{
+  "variantId": "uuid"
+}
+```
+
+Variant must belong to the store and be `ACTIVE`. If the variant is already wishlisted, returns the existing row (`200`). Otherwise `201`.
+
+**Response `data`:** Wishlist row (`id`, `storeId`, `customerId`, `variantId`, timestamps)
+
+---
+
+### DELETE `/store/wishlist/:itemId`
+
+**Headers:** `x-publishable-key`, `Authorization: Bearer <customer_token>`
+
+Remove by wishlist item id.
+
+**Response `data`:**
+
+```json
+{
+  "deleted": true
+}
+```
+
+---
+
+### DELETE `/store/wishlist/variants/:variantId`
+
+**Headers:** `x-publishable-key`, `Authorization: Bearer <customer_token>`
+
+Remove by variant id (handy for heart toggles without looking up the wishlist row id).
+
+**Response `data`:**
+
+```json
+{
+  "deleted": true
+}
+```
+
+---
+
 ## Endpoint index
 
 | Method | Path | Auth |
@@ -982,6 +1075,10 @@ Same fields as shipping address, plus optional `isDefault` (boolean). Setting `i
 | POST | `/api/v1/store/addresses` | publishable + customer |
 | PATCH | `/api/v1/store/addresses/:addressId` | publishable + customer |
 | DELETE | `/api/v1/store/addresses/:addressId` | publishable + customer |
+| GET | `/api/v1/store/wishlist` | publishable + customer |
+| POST | `/api/v1/store/wishlist` | publishable + customer |
+| DELETE | `/api/v1/store/wishlist/:itemId` | publishable + customer |
+| DELETE | `/api/v1/store/wishlist/variants/:variantId` | publishable + customer |
 
 ---
 

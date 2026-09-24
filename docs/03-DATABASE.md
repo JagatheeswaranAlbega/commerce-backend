@@ -29,6 +29,8 @@ Examples:
 - api_keys
 - inventory-related records
 
+**Exception — platform-owned Global Catalog:** `global_categories`, `global_products`, `global_product_variants`, and `global_product_images` have no `store_id`. Store availability is modeled by `store_global_products` (`store_id` + `global_product_id`, unique). Commerce tables that may reference either local or global variants (`cart_line_items`, `wishlist_items`, `inventory`, `inventory_movements`, `order_items`) use a `source` column (`STORE` | `GLOBAL`) and do not FK `variant_id` exclusively to `product_variants`.
+
 ## 3. Core Tables
 
 ### stores

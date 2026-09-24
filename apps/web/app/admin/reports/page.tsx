@@ -36,7 +36,7 @@ import {
   downloadPlatformSalesCsv,
   getPlatformSalesReport,
 } from "@/lib/api/platform/reports"
-import { formatDate } from "@/lib/format"
+import { formatDateTime } from "@/lib/format"
 import { formatPaise } from "@/lib/money"
 
 function defaultFrom(): string {
@@ -159,7 +159,7 @@ function ReportsContent({
       {
         accessorKey: "createdAt",
         header: "Created",
-        cell: ({ row }) => formatDate(row.original.createdAt),
+        cell: ({ row }) => formatDateTime(row.original.createdAt),
       },
       {
         accessorKey: "grandTotalPaise",

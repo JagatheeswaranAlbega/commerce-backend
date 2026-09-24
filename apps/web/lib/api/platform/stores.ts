@@ -12,23 +12,13 @@ export type PlatformStore = {
   updatedAt: string
 }
 
-export type PlatformStoreAdminSummary = {
-  id: string
-  email: string
-  role: string
-  storeId: string | null
-}
-
 export type CreateStoreInput = {
   name: string
   slug: string
-  adminEmail: string
-  adminPassword: string
 }
 
 export type CreateStoreResult = {
   store: PlatformStore
-  admin: PlatformStoreAdminSummary
   keys: {
     publishableKey: string
     secretKey: string
@@ -38,6 +28,13 @@ export type CreateStoreResult = {
 export type UpdateStoreInput = {
   name?: string
   status?: StoreStatus
+}
+
+export type DeletedPlatformStore = {
+  id: string
+  name: string
+  slug: string
+  deleted: true
 }
 
 export function listPlatformStores(input?: {
@@ -82,8 +79,8 @@ export function updatePlatformStore(
   })
 }
 
-export function deletePlatformStore(storeId: string): Promise<PlatformStore> {
-  return apiFetch<PlatformStore>(`/platform/stores/${storeId}`, {
+export function deletePlatformStore(storeId: string): Promise<DeletedPlatformStore> {
+  return apiFetch<DeletedPlatformStore>(`/platform/stores/${storeId}`, {
     method: "DELETE",
     auth: "session",
   })

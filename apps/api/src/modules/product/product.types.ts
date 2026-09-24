@@ -24,6 +24,9 @@ export type ProductResponse = {
   status: ProductStatus;
   createdAt: string;
   updatedAt: string;
+  /** Present when listing/detailing imported global masters in a store context. */
+  source?: "STORE" | "GLOBAL";
+  platformManaged?: boolean;
 };
 
 export type CreateProductInput = {
@@ -55,6 +58,7 @@ export type ListStoreProductsQuery = {
   status?: ProductStatus;
   categoryId?: string;
   q?: string;
+  source?: "STORE" | "GLOBAL";
 };
 
 export type ListAdminProductsQuery = {
@@ -83,7 +87,10 @@ export type CatalogProductPricing = {
   inStock: boolean;
 };
 
-export type CatalogProductResponse = ProductResponse & CatalogProductPricing;
+export type CatalogProductResponse = ProductResponse &
+  CatalogProductPricing & {
+    source?: "STORE" | "GLOBAL";
+  };
 
 export function toProductResponse(record: ProductRecord): ProductResponse {
   return {

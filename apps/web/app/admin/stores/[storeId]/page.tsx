@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { z } from "zod"
@@ -32,7 +32,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { PermissionGate } from "@/components/admin/permission-gate"
+import { PermissionGate, useAdminPermissions } from "@/components/admin/permission-gate"
+import { ConfirmDialog } from "@/components/admin/confirm-dialog"
 import { ApiError } from "@/lib/api"
 import {
   createStoreAdmin,
@@ -47,6 +48,7 @@ import {
   type CreateApiKeyResult,
 } from "@/lib/api/platform/keys"
 import {
+  deletePlatformStore,
   getPlatformStore,
   updatePlatformStore,
 } from "@/lib/api/platform/stores"
@@ -68,7 +70,10 @@ export default function PlatformStoreDetailPage() {
 function StoreDetailPageContent() {
   const params = useParams<{ storeId: string }>()
   const storeId = params.storeId
+  const router = useRouter()
   const queryClient = useQueryClient()
+  const { can } = useAdminPermissions()
+  const canManage = can("stores.manage")
 
   const [storeName, setStoreName] = useState("")
   const [adminEmail, setAdminEmail] = useState("")
@@ -77,6 +82,8 @@ function StoreDetailPageContent() {
   const [resetUserId, setResetUserId] = useState<string | null>(null)
   const [adminError, setAdminError] = useState<string | null>(null)
   const [createdKey, setCreatedKey] = useState<CreateApiKeyResult | null>(null)
+  const [statusDialogOpen, setStatusDialogOpen] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 
   const storeQuery = useQuery({
     queryKey: ["platform", "stores", storeId],
@@ -97,9 +104,21 @@ function StoreDetailPageContent() {
     mutationFn: (status: "ACTIVE" | "INACTIVE") =>
       updatePlatformStore(storeId, { status }),
     onSuccess: async () => {
+      setStatusDialogOpen(false)
       await queryClient.invalidateQueries({
-        queryKey: ["platform", "stores", storeId],
+        queryKey: ["platform", "stores"],
       })
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deletePlatformStore(storeId),
+    onSuccess: async () => {
+      setDeleteDialogOpen(false)
+      await queryClient.invalidateQueries({
+        queryKey: ["platform", "stores"],
+      })
+      router.push("/admin/stores")
     },
   })
 
@@ -248,18 +267,26 @@ function StoreDetailPageContent() {
             >
               {store.status}
             </Badge>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={statusMutation.isPending}
-              onClick={() =>
-                statusMutation.mutate(
-                  store.status === "ACTIVE" ? "INACTIVE" : "ACTIVE"
-                )
-              }
-            >
-              {store.status === "ACTIVE" ? "Deactivate" : "Activate"}
-            </Button>
+            {canManage ? (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={statusMutation.isPending}
+                  onClick={() => setStatusDialogOpen(true)}
+                >
+                  {store.status === "ACTIVE" ? "Deactivate" : "Activate"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={deleteMutation.isPending}
+                  onClick={() => setDeleteDialogOpen(true)}
+                >
+                  Delete
+                </Button>
+              </>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -534,6 +561,41 @@ function StoreDetailPageContent() {
           </CardContent>
         </Card>
       </div>
+
+      <ConfirmDialog
+        open={statusDialogOpen}
+        onOpenChange={setStatusDialogOpen}
+        title={store?.status === "ACTIVE" ? "Deactivate store?" : "Activate store?"}
+        description={
+          store
+            ? store.status === "ACTIVE"
+              ? `Deactivate “${store.name}”? The storefront and store admins will lose access until it is activated again.`
+              : `Activate “${store.name}”? Storefront and store admin access will resume.`
+            : ""
+        }
+        confirmLabel={store?.status === "ACTIVE" ? "Deactivate" : "Activate"}
+        variant={store?.status === "ACTIVE" ? "warning" : "default"}
+        pending={statusMutation.isPending}
+        onConfirm={() => {
+          if (!store) return
+          statusMutation.mutate(store.status === "ACTIVE" ? "INACTIVE" : "ACTIVE")
+        }}
+      />
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Delete store?"
+        description={
+          store
+            ? `Permanently delete “${store.name}” and all of its products, orders, customers, admins, and keys? This cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete store"
+        variant="destructive"
+        pending={deleteMutation.isPending}
+        onConfirm={() => deleteMutation.mutate()}
+      />
     </div>
   )
 }

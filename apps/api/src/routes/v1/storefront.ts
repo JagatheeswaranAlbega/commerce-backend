@@ -9,8 +9,10 @@ import { ProductService } from "@/modules/product/product.service";
 import {
   listStorefrontProductsQuerySchema,
 } from "@/modules/product/product.schemas";
-import { VariantRepository } from "@/modules/variant/variant.repository";
-import { toVariantResponse } from "@/modules/variant/variant.types";
+import {
+  findSellableVariant,
+  listSellableVariantsForProduct,
+} from "@/modules/global-catalog/sellable-variant";
 import { CollectionService } from "@/modules/collection/collection.service";
 import {
   assertDiscountApplicable,
@@ -36,6 +38,7 @@ import { carts } from "@/db/schema/carts";
 import { cartLineItems } from "@/db/schema/cart-line-items";
 import { customers } from "@/db/schema/customers";
 import { customerAddresses } from "@/db/schema/customer-addresses";
+import { wishlistItems } from "@/db/schema/wishlist-items";
 import { discounts } from "@/db/schema/discounts";
 import { orderReturns } from "@/db/schema/order-returns";
 import { orders } from "@/db/schema/orders";
@@ -235,33 +238,63 @@ export function createStorefrontRoutes() {
     if (opened) scheduleDbClose(c, opened);
     const sid = storeId(c);
     const product = await new ProductService(db).getCatalogByHandle(sid, c.req.param("handle"));
-    const variants = await new VariantRepository(db).listByProduct(sid, product.id);
+    const source = product.source;
+    const sellable = await listSellableVariantsForProduct(db, sid, product.id, source);
     const stocks = await db.query.inventory.findMany({
       where: and(eq(inventory.storeId, sid)),
     });
     const stockByVariant = new Map(stocks.map((s) => [s.variantId, s.availableQuantity]));
-    const { MediaService } = await import("@/modules/media/media.service");
-    const images = await new MediaService(db).listByProduct(sid, product.id);
+
+    let images: Array<{
+      id: string;
+      altText: string | null;
+      isThumbnail?: boolean;
+      sortOrder?: number;
+      src: string;
+    }> = [];
+
+    if (source === "STORE") {
+      const { MediaService } = await import("@/modules/media/media.service");
+      const media = await new MediaService(db).listByProduct(sid, product.id);
+      images = media.map((image) => ({
+        ...image,
+        src: `/api/v1/store/media/${image.id}`,
+      }));
+    } else {
+      const media = await new ProductService(db).listGlobalCatalogImages(product.id);
+      images = media.map((image) => ({
+        id: image.id,
+        altText: image.altText,
+        isThumbnail: image.isThumbnail,
+        sortOrder: image.sortOrder,
+        src: `/api/v1/store/global-media/${image.id}`,
+      }));
+    }
+
+    const thumbnail =
+      images.find((img) => img.isThumbnail) ?? images[0] ?? null;
+
     return sendSuccess(
       c,
       {
         ...product,
-        variants: variants
-          .filter((v) => v.status === "ACTIVE")
-          .map((v) =>
-            toVariantResponse(v, {
-              availableQuantity: stockByVariant.get(v.id) ?? 0,
-            }),
-          ),
-        images: images.map((image) => ({
-          ...image,
-          src: `/api/v1/store/media/${image.id}`,
+        variants: sellable.map((v) => ({
+          id: v.variantId,
+          productId: v.productId,
+          sku: v.sku,
+          title: v.title,
+          pricePaise: v.pricePaise,
+          compareAtPricePaise: v.compareAtPricePaise,
+          status: v.status,
+          availableQuantity: stockByVariant.get(v.variantId) ?? 0,
+          source: v.source,
         })),
-        thumbnail: images[0]
+        images,
+        thumbnail: thumbnail
           ? {
-              id: images[0].id,
-              altText: images[0].altText,
-              src: `/api/v1/store/media/${images[0].id}`,
+              id: thumbnail.id,
+              altText: thumbnail.altText,
+              src: thumbnail.src,
             }
           : null,
       },
@@ -277,12 +310,43 @@ export function createStorefrontRoutes() {
     const media = await new MediaService(db).getById(sid, c.req.param("mediaId"));
     const bucket = c.env.PRODUCT_MEDIA;
     if (!bucket) throw new NotFoundError("Media storage is not configured.");
-    const { getObject } = await import("@/infrastructure/r2/product-media");
+    const { getObject, readObjectBytes, resolveMediaContentType } = await import(
+      "@/infrastructure/r2/product-media"
+    );
     const object = await getObject(bucket, media.storageKey);
-    if (!object?.body) throw new NotFoundError("Media object not found.");
-    return new Response(object.body, {
+    if (!object) throw new NotFoundError("Media object not found.");
+    const bytes = await readObjectBytes(object);
+    if (!bytes) throw new NotFoundError("Media object not found.");
+    const contentType = resolveMediaContentType(object.httpMetadata?.contentType, bytes);
+    return new Response(bytes, {
       headers: {
-        "Content-Type": object.httpMetadata?.contentType ?? "application/octet-stream",
+        "Content-Type": contentType,
+        "Cache-Control": "public, max-age=3600",
+      },
+    });
+  });
+
+  app.get("/global-media/:mediaId", async (c) => {
+    const { db, opened } = await useRequestDb(c);
+    if (opened) scheduleDbClose(c, opened);
+    const { GlobalCatalogRepository } = await import(
+      "@/modules/global-catalog/global-catalog.repository"
+    );
+    const image = await new GlobalCatalogRepository(db).findImageById(c.req.param("mediaId"));
+    if (!image) throw new NotFoundError("Media not found.");
+    const bucket = c.env.PRODUCT_MEDIA;
+    if (!bucket) throw new NotFoundError("Media storage is not configured.");
+    const { getObject, readObjectBytes, resolveMediaContentType } = await import(
+      "@/infrastructure/r2/product-media"
+    );
+    const object = await getObject(bucket, image.storageKey);
+    if (!object) throw new NotFoundError("Media object not found.");
+    const bytes = await readObjectBytes(object);
+    if (!bytes) throw new NotFoundError("Media object not found.");
+    const contentType = resolveMediaContentType(object.httpMetadata?.contentType, bytes);
+    return new Response(bytes, {
+      headers: {
+        "Content-Type": contentType,
         "Cache-Control": "public, max-age=3600",
       },
     });
@@ -432,7 +496,7 @@ export function createStorefrontRoutes() {
     if (opened) scheduleDbClose(c, opened);
     const sid = storeId(c);
     await loadCart(db, sid, c.req.param("cartId"));
-    const variant = await new VariantRepository(db).findByStoreAndId(sid, body.data.variantId);
+    const variant = await findSellableVariant(db, sid, body.data.variantId);
     if (!variant || variant.status !== "ACTIVE") throw new NotFoundError("Variant not found.");
     const existing = await db.query.cartLineItems.findFirst({
       where: and(
@@ -460,6 +524,7 @@ export function createStorefrontRoutes() {
         storeId: sid,
         cartId: c.req.param("cartId"),
         variantId: body.data.variantId,
+        source: variant.source,
         quantity: body.data.quantity,
         unitPricePaise: variant.pricePaise,
       });
@@ -759,16 +824,14 @@ export function createStorefrontRoutes() {
           .returning();
 
         for (const item of cart.items) {
-          const variant = await new VariantRepository(tx as typeof db).findByStoreAndId(
-            sid,
-            item.variantId,
-          );
+          const variant = await findSellableVariant(tx as typeof db, sid, item.variantId);
           await tx.insert(orderItems).values({
             storeId: sid,
             orderId: order!.id,
             productId: variant?.productId ?? null,
             variantId: item.variantId,
-            productTitle: variant?.title ?? "Product",
+            source: variant?.source ?? item.source ?? "STORE",
+            productTitle: variant?.productTitle ?? "Product",
             variantTitle: variant?.title ?? "Variant",
             sku: variant?.sku ?? "UNKNOWN",
             unitPricePaise: item.unitPricePaise,
@@ -792,6 +855,7 @@ export function createStorefrontRoutes() {
           await tx.insert(inventoryMovements).values({
             storeId: sid,
             variantId: item.variantId,
+            source: variant?.source ?? item.source ?? "STORE",
             type: "SALE",
             quantity: -item.quantity,
             reference: order!.id,
@@ -1162,6 +1226,135 @@ export function createStorefrontRoutes() {
       .returning({ id: customerAddresses.id });
     if (!deleted.length) throw new NotFoundError("Address not found.");
     return sendSuccess(c, { deleted: true }, { message: SUCCESS_MESSAGES.ADDRESS_DELETED });
+  });
+
+  app.get("/wishlist", async (c) => {
+    const sid = storeId(c);
+    const customerId = await requireCustomerId(c, sid);
+    const { db, opened } = await useRequestDb(c);
+    if (opened) scheduleDbClose(c, opened);
+    const items = await db.query.wishlistItems.findMany({
+      where: and(eq(wishlistItems.storeId, sid), eq(wishlistItems.customerId, customerId)),
+      orderBy: [desc(wishlistItems.createdAt)],
+    });
+    const stocks = await db.query.inventory.findMany({
+      where: eq(inventory.storeId, sid),
+    });
+    const stockByVariant = new Map(stocks.map((s) => [s.variantId, s.availableQuantity]));
+    const data = [];
+    for (const item of items) {
+      const variant = await findSellableVariant(db, sid, item.variantId);
+      data.push({
+        id: item.id,
+        storeId: item.storeId,
+        customerId: item.customerId,
+        variantId: item.variantId,
+        source: item.source,
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+        variant: variant
+          ? {
+              id: variant.variantId,
+              productId: variant.productId,
+              sku: variant.sku,
+              title: variant.title,
+              pricePaise: variant.pricePaise,
+              compareAtPricePaise: variant.compareAtPricePaise,
+              status: variant.status,
+              availableQuantity: stockByVariant.get(variant.variantId) ?? 0,
+              source: variant.source,
+            }
+          : null,
+        product: variant
+          ? {
+              id: variant.productId,
+              title: variant.productTitle,
+              handle: variant.productHandle,
+              status: "ACTIVE",
+              source: variant.source,
+            }
+          : null,
+      });
+    }
+    return sendSuccess(c, data, { message: SUCCESS_MESSAGES.WISHLIST_RETRIEVED });
+  });
+
+  app.post("/wishlist", async (c) => {
+    const body = z
+      .object({ variantId: z.string().uuid() })
+      .safeParse(await c.req.json());
+    if (!body.success) throw new ValidationError("Invalid wishlist item.", body.error.flatten());
+    const sid = storeId(c);
+    const customerId = await requireCustomerId(c, sid);
+    const { db, opened } = await useRequestDb(c);
+    if (opened) scheduleDbClose(c, opened);
+
+    const variant = await findSellableVariant(db, sid, body.data.variantId);
+    if (!variant || variant.status !== "ACTIVE") throw new NotFoundError("Variant not found.");
+
+    const existing = await db.query.wishlistItems.findFirst({
+      where: and(
+        eq(wishlistItems.storeId, sid),
+        eq(wishlistItems.customerId, customerId),
+        eq(wishlistItems.variantId, body.data.variantId),
+      ),
+    });
+    if (existing) {
+      return sendSuccess(c, existing, { message: SUCCESS_MESSAGES.WISHLIST_ITEM_ADDED });
+    }
+
+    const [created] = await db
+      .insert(wishlistItems)
+      .values({
+        storeId: sid,
+        customerId,
+        variantId: body.data.variantId,
+        source: variant.source,
+      })
+      .returning();
+
+    return sendSuccess(c, created, {
+      message: SUCCESS_MESSAGES.WISHLIST_ITEM_ADDED,
+      status: HTTP_STATUS.CREATED,
+    });
+  });
+
+  app.delete("/wishlist/variants/:variantId", async (c) => {
+    const sid = storeId(c);
+    const customerId = await requireCustomerId(c, sid);
+    const { db, opened } = await useRequestDb(c);
+    if (opened) scheduleDbClose(c, opened);
+    const deleted = await db
+      .delete(wishlistItems)
+      .where(
+        and(
+          eq(wishlistItems.variantId, c.req.param("variantId")),
+          eq(wishlistItems.storeId, sid),
+          eq(wishlistItems.customerId, customerId),
+        ),
+      )
+      .returning({ id: wishlistItems.id });
+    if (!deleted.length) throw new NotFoundError("Wishlist item not found.");
+    return sendSuccess(c, { deleted: true }, { message: SUCCESS_MESSAGES.WISHLIST_ITEM_REMOVED });
+  });
+
+  app.delete("/wishlist/:itemId", async (c) => {
+    const sid = storeId(c);
+    const customerId = await requireCustomerId(c, sid);
+    const { db, opened } = await useRequestDb(c);
+    if (opened) scheduleDbClose(c, opened);
+    const deleted = await db
+      .delete(wishlistItems)
+      .where(
+        and(
+          eq(wishlistItems.id, c.req.param("itemId")),
+          eq(wishlistItems.storeId, sid),
+          eq(wishlistItems.customerId, customerId),
+        ),
+      )
+      .returning({ id: wishlistItems.id });
+    if (!deleted.length) throw new NotFoundError("Wishlist item not found.");
+    return sendSuccess(c, { deleted: true }, { message: SUCCESS_MESSAGES.WISHLIST_ITEM_REMOVED });
   });
 
   return app;

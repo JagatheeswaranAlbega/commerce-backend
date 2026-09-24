@@ -50,7 +50,7 @@ npm run db:migrate
 npm run db:seed
 ```
 
-Seed prints Store A/B publishable and secret keys for Postman.
+Seed prints Alora Fashion / Zentrix publishable and secret keys for Postman.
 
 4. Run apps:
 
@@ -64,9 +64,9 @@ npm run dev
 
 Default seed logins:
 
-- Platform: `platform@local.dev` / `Platform@123`
-- Store A admin: `admin@store-a.local` / `SEED_STORE_PASSWORD`
-- Store B admin: `admin@store-b.local` / `SEED_STORE_PASSWORD`
+- Platform: `platform@admin.com` / `Platform@123`
+- Alora Fashion admin: `admin@alora.com` / `Admin@123`
+- Zentrix admin: `admin@zentrix.com` / `Admin@123`
 
 ## Postman handoff
 

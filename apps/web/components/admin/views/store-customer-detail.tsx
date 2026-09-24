@@ -11,7 +11,7 @@ import {
   type AdminCustomerAddress,
 } from "@/lib/api/admin/customers"
 import type { AdminOrder } from "@/lib/api/admin/orders"
-import { formatDate } from "@/lib/format"
+import { formatDate, formatDateTime } from "@/lib/format"
 import { formatPaise } from "@/lib/money"
 
 export function StoreCustomerDetail() {
@@ -93,7 +93,7 @@ export function StoreCustomerDetail() {
       {
         accessorKey: "createdAt",
         header: "Created",
-        cell: ({ row }) => formatDate(row.original.createdAt),
+        cell: ({ row }) => formatDateTime(row.original.createdAt),
       },
     ],
     []

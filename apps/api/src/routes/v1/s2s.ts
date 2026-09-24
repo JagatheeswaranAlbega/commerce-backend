@@ -4,8 +4,6 @@ import { requireSecretKey } from "@/middleware/require-storefront";
 import { scheduleDbClose, useRequestDb } from "@/middleware/database";
 import { ProductService } from "@/modules/product/product.service";
 import { listStorefrontProductsQuerySchema } from "@/modules/product/product.schemas";
-import { VariantRepository } from "@/modules/variant/variant.repository";
-import { toVariantResponse } from "@/modules/variant/variant.types";
 import { stores } from "@/db/schema/stores";
 import { storeSettings } from "@/db/schema/store-settings";
 import { inventory } from "@/db/schema/inventory";
@@ -98,30 +96,53 @@ export function createS2sRoutes() {
     if (opened) scheduleDbClose(c, opened);
     const sid = storeId(c);
     const product = await new ProductService(db).getCatalogByHandle(sid, c.req.param("handle"));
-    const variants = await new VariantRepository(db).listByProduct(sid, product.id);
+    const { listSellableVariantsForProduct } = await import(
+      "@/modules/global-catalog/sellable-variant"
+    );
+    const sellable = await listSellableVariantsForProduct(db, sid, product.id, product.source);
     const stocks = await db.query.inventory.findMany({
       where: and(eq(inventory.storeId, sid)),
     });
     const stockByVariant = new Map(stocks.map((s) => [s.variantId, s.availableQuantity]));
-    const { MediaService } = await import("@/modules/media/media.service");
-    const images = await new MediaService(db).listByProduct(sid, product.id);
+
+    let images: Array<{ id: string; altText: string | null; src: string }> = [];
+    if (product.source === "STORE") {
+      const { MediaService } = await import("@/modules/media/media.service");
+      const media = await new MediaService(db).listByProduct(sid, product.id);
+      images = media.map((image) => ({
+        ...image,
+        src: `/api/v1/store/media/${image.id}`,
+      }));
+    } else {
+      const media = await new ProductService(db).listGlobalCatalogImages(product.id);
+      images = media.map((image) => ({
+        id: image.id,
+        altText: image.altText,
+        src: `/api/v1/store/global-media/${image.id}`,
+      }));
+    }
+
     return sendSuccess(
       c,
       {
         ...product,
-        variants: variants.map((v) => ({
-          ...toVariantResponse(v),
-          availableQuantity: stockByVariant.get(v.id) ?? 0,
+        variants: sellable.map((v) => ({
+          id: v.variantId,
+          productId: v.productId,
+          sku: v.sku,
+          title: v.title,
+          pricePaise: v.pricePaise,
+          compareAtPricePaise: v.compareAtPricePaise,
+          status: v.status,
+          availableQuantity: stockByVariant.get(v.variantId) ?? 0,
+          source: v.source,
         })),
-        images: images.map((image) => ({
-          ...image,
-          src: `/api/v1/store/media/${image.id}`,
-        })),
+        images,
         thumbnail: images[0]
           ? {
               id: images[0].id,
               altText: images[0].altText,
-              src: `/api/v1/store/media/${images[0].id}`,
+              src: images[0].src,
             }
           : null,
       },

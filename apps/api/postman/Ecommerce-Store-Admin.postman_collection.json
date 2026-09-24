@@ -5,17 +5,54 @@
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "base_url", "value": "http://localhost:8787/api/v1" },
-    { "key": "jwt_token", "value": "" },
-    { "key": "product_id", "value": "" },
-    { "key": "variant_id", "value": "" },
-    { "key": "order_id", "value": "" },
-    { "key": "category_id", "value": "" },
-    { "key": "collection_id", "value": "" },
-    { "key": "discount_id", "value": "" },
-    { "key": "customer_id", "value": "" },
-    { "key": "media_id", "value": "" },
-    { "key": "key_id", "value": "" }
+    {
+      "key": "base_url",
+      "value": "http://localhost:8787/api/v1"
+    },
+    {
+      "key": "jwt_token",
+      "value": ""
+    },
+    {
+      "key": "product_id",
+      "value": ""
+    },
+    {
+      "key": "variant_id",
+      "value": ""
+    },
+    {
+      "key": "order_id",
+      "value": ""
+    },
+    {
+      "key": "category_id",
+      "value": ""
+    },
+    {
+      "key": "collection_id",
+      "value": ""
+    },
+    {
+      "key": "discount_id",
+      "value": ""
+    },
+    {
+      "key": "customer_id",
+      "value": ""
+    },
+    {
+      "key": "media_id",
+      "value": ""
+    },
+    {
+      "key": "key_id",
+      "value": ""
+    },
+    {
+      "key": "global_product_id",
+      "value": ""
+    }
   ],
   "item": [
     {
@@ -38,10 +75,15 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"admin@store-a.local\",\n  \"password\": \"StoreAdmin@123\"\n}"
+              "raw": "{\n  \"email\": \"admin@alora.com\",\n  \"password\": \"Admin@123\"\n}"
             },
             "url": "{{base_url}}/auth/login"
           }
@@ -50,7 +92,12 @@
           "name": "Me",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/auth/me"
           }
         },
@@ -59,12 +106,18 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"currentPassword\": \"StoreAdmin@123\",\n  \"newPassword\": \"StoreAdmin@123\"\n}"
+              "raw": "{\n  \"currentPassword\": \"Admin@123\",\n  \"newPassword\": \"Admin@123\"\n}"
             },
             "url": "{{base_url}}/auth/change-password"
           }
@@ -78,7 +131,12 @@
           "name": "Dashboard",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/admin/dashboard"
           }
         },
@@ -86,7 +144,12 @@
           "name": "List Products",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/admin/products"
           }
         },
@@ -95,8 +158,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -109,7 +178,12 @@
           "name": "Get Product",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/admin/products/{{product_id}}"
           }
         },
@@ -118,8 +192,14 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -132,7 +212,12 @@
           "name": "Delete Product",
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/admin/products/{{product_id}}"
           }
         },
@@ -140,7 +225,12 @@
           "name": "List Variants",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/admin/products/{{product_id}}/variants"
           }
         },
@@ -149,8 +239,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -164,8 +260,14 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -178,7 +280,12 @@
           "name": "Delete Variant",
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/admin/products/{{product_id}}/variants/{{variant_id}}"
           }
         },
@@ -186,7 +293,12 @@
           "name": "List Categories",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/admin/categories"
           }
         },
@@ -195,8 +307,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -210,8 +328,14 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -224,7 +348,12 @@
           "name": "Delete Category",
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/admin/categories/{{category_id}}"
           }
         },
@@ -232,7 +361,12 @@
           "name": "List Collections",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/admin/collections"
           }
         },
@@ -241,8 +375,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -256,8 +396,14 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -270,7 +416,12 @@
           "name": "Delete Collection",
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/admin/collections/{{collection_id}}"
           }
         },
@@ -278,7 +429,12 @@
           "name": "List Collection Products",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/admin/collections/{{collection_id}}/products"
           }
         },
@@ -287,8 +443,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -301,7 +463,12 @@
           "name": "Remove Product From Collection",
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/admin/collections/{{collection_id}}/products/{{product_id}}"
           }
         },
@@ -309,13 +476,30 @@
           "name": "Upload Product Media",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "body": {
               "mode": "formdata",
               "formdata": [
-                { "key": "productId", "value": "{{product_id}}", "type": "text" },
-                { "key": "file", "type": "file", "src": [] },
-                { "key": "altText", "value": "Product image", "type": "text" }
+                {
+                  "key": "productId",
+                  "value": "{{product_id}}",
+                  "type": "text"
+                },
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "altText",
+                  "value": "Product image",
+                  "type": "text"
+                }
               ]
             },
             "url": "{{base_url}}/admin/media/upload"
@@ -325,7 +509,12 @@
           "name": "List Product Media",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/admin/products/{{product_id}}/media"
           }
         },
@@ -334,8 +523,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -349,7 +544,12 @@
           "name": "Get Media",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/admin/media/{{media_id}}"
           }
         },
@@ -357,7 +557,12 @@
           "name": "Delete Media",
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/admin/media/{{media_id}}"
           }
         },
@@ -365,7 +570,12 @@
           "name": "List Inventory",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/admin/inventory"
           }
         },
@@ -373,7 +583,12 @@
           "name": "Get Inventory",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/admin/inventory/{{variant_id}}"
           }
         },
@@ -382,8 +597,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -396,7 +617,12 @@
           "name": "List Orders",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/admin/orders?page=1&pageSize=20"
           }
         },
@@ -404,7 +630,12 @@
           "name": "Get Order",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/admin/orders/{{order_id}}"
           }
         },
@@ -413,8 +644,14 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -428,8 +665,14 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -443,8 +686,14 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -458,8 +707,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -472,7 +727,12 @@
           "name": "List Discounts",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/admin/discounts"
           }
         },
@@ -492,8 +752,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -507,8 +773,14 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -521,7 +793,12 @@
           "name": "Delete Discount",
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/admin/discounts/{{discount_id}}"
           }
         },
@@ -529,7 +806,12 @@
           "name": "List Customers",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/admin/customers?page=1&pageSize=20"
           }
         },
@@ -537,7 +819,12 @@
           "name": "Get Customer",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/admin/customers/{{customer_id}}"
           }
         },
@@ -545,7 +832,12 @@
           "name": "List Media",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/admin/media?page=1&pageSize=20"
           }
         },
@@ -553,7 +845,12 @@
           "name": "List API Keys",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/admin/keys"
           }
         },
@@ -562,8 +859,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -576,7 +879,12 @@
           "name": "Delete API Key",
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/admin/keys/{{key_id}}"
           }
         },
@@ -584,7 +892,12 @@
           "name": "Inventory Movements",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/admin/inventory/{{variant_id}}/movements?page=1&pageSize=20"
           }
         },
@@ -592,7 +905,12 @@
           "name": "Get Settings",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/admin/settings"
           }
         },
@@ -601,14 +919,90 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Demo Store\",\n  \"domain\": \"demo.local\",\n  \"contactEmail\": \"store@local.dev\"\n}"
             },
             "url": "{{base_url}}/admin/settings"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Global Catalog",
+      "item": [
+        {
+          "name": "List global categories",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": "{{base_url}}/admin/global-catalog/categories"
+          }
+        },
+        {
+          "name": "List global products",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": "{{base_url}}/admin/global-catalog/products?page=1&pageSize=20"
+          }
+        },
+        {
+          "name": "Get global product",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": "{{base_url}}/admin/global-catalog/products/{{global_product_id}}"
+          }
+        },
+        {
+          "name": "Import global product",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": "{{base_url}}/admin/global-catalog/products/{{global_product_id}}/import"
+          }
+        },
+        {
+          "name": "Remove global product import",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": "{{base_url}}/admin/global-catalog/products/{{global_product_id}}/import"
           }
         }
       ]

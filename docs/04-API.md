@@ -78,6 +78,17 @@ requirePlatformAdmin
 - `GET /platform/orders`
 - `GET /platform/products`
 
+### Global Catalog
+
+- `GET|POST /platform/global-categories`
+- `GET|PATCH|DELETE /platform/global-categories/:categoryId`
+- `GET|POST /platform/global-products`
+- `GET|PATCH|DELETE /platform/global-products/:productId`
+- `GET|POST /platform/global-products/:productId/variants`
+- `PATCH|DELETE /platform/global-products/:productId/variants/:variantId`
+- `GET /platform/global-products/:productId/media`
+- `POST /platform/global-media/upload`
+
 Exact global endpoints can be adjusted during implementation.
 
 ## 3. Store Admin API
@@ -103,6 +114,15 @@ Store ID comes from authenticated context, not the request body.
 - `GET /admin/products/:productId`
 - `PATCH /admin/products/:productId`
 - `DELETE /admin/products/:productId`
+
+### Global Catalog (read + import)
+
+- `GET /admin/global-catalog/categories`
+- `GET /admin/global-catalog/categories/:categoryId`
+- `GET /admin/global-catalog/products`
+- `GET /admin/global-catalog/products/:productId`
+- `POST /admin/global-catalog/products/:productId/import`
+- `DELETE /admin/global-catalog/products/:productId/import`
 
 ### Variants
 

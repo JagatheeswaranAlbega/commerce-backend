@@ -302,7 +302,7 @@ function StoreAdminsPageContent() {
               <Field>
                 <FieldLabel htmlFor="create-store">Store</FieldLabel>
                 <Select
-                  value={createStoreId || undefined}
+                  value={createStoreId || null}
                   items={stores.map((store) => ({
                     value: store.id,
                     label: store.name,

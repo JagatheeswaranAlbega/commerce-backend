@@ -13,6 +13,8 @@ export type AdminProduct = {
   categoryId?: string | null
   createdAt: string
   updatedAt?: string
+  source?: "STORE" | "GLOBAL"
+  platformManaged?: boolean
   thumbnail?: {
     id: string
     altText: string | null
@@ -47,6 +49,8 @@ export type AdminProductImage = {
 export type AdminProductDetail = AdminProduct & {
   variants: AdminVariant[]
   images: AdminProductImage[]
+  source?: "STORE" | "GLOBAL"
+  platformManaged?: boolean
 }
 
 export type CreateProductInput = {
@@ -85,6 +89,7 @@ export function listAdminProducts(input?: {
   status?: ProductStatus
   categoryId?: string
   q?: string
+  source?: "STORE" | "GLOBAL"
 }): Promise<{ data: AdminProduct[]; pagination?: PaginationMeta }> {
   return apiFetchList<AdminProduct[]>(
     `/admin/products${toQueryString({
@@ -93,6 +98,7 @@ export function listAdminProducts(input?: {
       status: input?.status,
       categoryId: input?.categoryId,
       q: input?.q,
+      source: input?.source,
     })}`,
     { auth: "session" }
   )

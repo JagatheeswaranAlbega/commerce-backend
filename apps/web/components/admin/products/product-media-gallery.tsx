@@ -1,126 +1,182 @@
 "use client"
 
-import { useState } from "react"
-import { ArrowLeft, ArrowRight, ImageIcon, Upload } from "lucide-react"
+import { useEffect, useState } from "react"
+import { ImageIcon, Star, Trash2, Upload } from "lucide-react"
 
 import { useAuthedMediaUrl } from "@/components/admin/products/product-table-thumbnail"
 import { Button } from "@/components/ui/button"
-import { Field, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import type { AdminProductImage } from "@/lib/api/admin/products"
 import { cn } from "@/lib/utils"
+
+export type ProductMediaItem = {
+  id: string
+  altText: string | null
+  isThumbnail?: boolean
+  sortOrder?: number | null
+}
+
+const DEFAULT_MEDIA_PATH_PREFIX = "/api/v1/admin/media"
 
 function MediaThumb({
   mediaId,
   alt,
   isThumbnail,
-  canMoveLeft,
-  canMoveRight,
-  onRemove,
-  onSetThumbnail,
-  onMoveLeft,
-  onMoveRight,
-  removing,
-  settingThumbnail,
-  reordering,
-  disabled,
+  selected,
+  onSelect,
+  compact,
+  mediaPathPrefix,
 }: {
   mediaId: string
   alt: string
   isThumbnail: boolean
-  canMoveLeft: boolean
-  canMoveRight: boolean
-  onRemove: () => void
-  onSetThumbnail: () => void
-  onMoveLeft: () => void
-  onMoveRight: () => void
-  removing: boolean
-  settingThumbnail: boolean
-  reordering: boolean
-  disabled?: boolean
+  selected: boolean
+  onSelect: () => void
+  compact?: boolean
+  mediaPathPrefix: string
 }) {
-  const url = useAuthedMediaUrl(mediaId)
+  const url = useAuthedMediaUrl(mediaId, mediaPathPrefix)
+
   return (
-    <div
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-label={`View ${alt}`}
+      aria-pressed={selected}
       className={cn(
-        "group relative overflow-hidden rounded-lg border bg-muted/30",
-        isThumbnail && "ring-2 ring-foreground/80"
+        "relative block shrink-0 overflow-hidden rounded-md border bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+        isThumbnail && "ring-2 ring-foreground/80",
+        selected && "ring-2 ring-primary"
       )}
     >
       {url ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={url} alt={alt} className="h-28 w-28 object-cover" />
+        <img
+          src={url}
+          alt={alt}
+          className={cn("object-cover", compact ? "size-12" : "h-20 w-20")}
+        />
       ) : (
-        <div className="flex h-28 w-28 items-center justify-center text-muted-foreground">
-          <ImageIcon className="size-5" />
+        <div
+          className={cn(
+            "flex items-center justify-center text-muted-foreground",
+            compact ? "size-12" : "h-20 w-20"
+          )}
+        >
+          <ImageIcon className="size-4" />
         </div>
       )}
       {isThumbnail ? (
-        <span className="absolute left-1 top-1 rounded bg-foreground px-1.5 py-0.5 text-[10px] font-medium text-background">
-          Thumbnail
+        <span
+          className={cn(
+            "absolute left-0.5 top-0.5 rounded bg-foreground font-medium text-background",
+            compact
+              ? "p-0.5"
+              : "px-1.5 py-0.5 text-[10px]"
+          )}
+        >
+          {compact ? (
+            <Star className="size-2.5 fill-current" aria-hidden />
+          ) : (
+            "Thumbnail"
+          )}
+          {compact ? <span className="sr-only">Thumbnail</span> : null}
         </span>
       ) : null}
-      <div className="absolute inset-x-0 bottom-0 flex flex-col gap-0.5 bg-black/55 p-1 opacity-0 transition-opacity group-hover:opacity-100">
-        <div className="flex gap-0.5">
+    </button>
+  )
+}
+
+function MediaPreview({
+  mediaId,
+  alt,
+  isThumbnail,
+  onRemove,
+  onSetThumbnail,
+  removing,
+  settingThumbnail,
+  disabled,
+  compact,
+  readOnly,
+  mediaPathPrefix,
+}: {
+  mediaId: string
+  alt: string
+  isThumbnail: boolean
+  onRemove: () => void
+  onSetThumbnail: () => void
+  removing: boolean
+  settingThumbnail: boolean
+  disabled?: boolean
+  compact?: boolean
+  readOnly?: boolean
+  mediaPathPrefix: string
+}) {
+  const url = useAuthedMediaUrl(mediaId, mediaPathPrefix)
+  const busy = disabled || removing || settingThumbnail
+
+  return (
+    <div className="relative overflow-hidden rounded-lg border bg-muted/20">
+      {url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={url}
+          alt={alt}
+          className={cn(
+            "mx-auto w-full object-contain",
+            compact ? "max-h-[280px]" : "max-h-[320px]"
+          )}
+        />
+      ) : (
+        <div
+          className={cn(
+            "flex items-center justify-center text-muted-foreground",
+            compact ? "h-40" : "h-52"
+          )}
+        >
+          <ImageIcon className="size-7 opacity-50" />
+        </div>
+      )}
+      {readOnly ? null : (
+        <div className="flex flex-wrap items-center gap-1.5 border-t bg-background/90 px-2 py-1.5">
           <Button
             type="button"
-            variant="ghost"
-            size="sm"
-            className="h-7 flex-1 text-xs text-white hover:bg-white/10 hover:text-white"
-            disabled={disabled || reordering || !canMoveLeft}
-            onClick={onMoveLeft}
-            aria-label="Move earlier"
+            variant="outline"
+            size="xs"
+            disabled={busy}
+            onClick={onSetThumbnail}
           >
-            <ArrowLeft className="size-3.5" />
+            <Star className="size-3" />
+            {isThumbnail ? "Unset thumbnail" : "Set as thumbnail"}
           </Button>
           <Button
             type="button"
-            variant="ghost"
-            size="sm"
-            className="h-7 flex-1 text-xs text-white hover:bg-white/10 hover:text-white"
-            disabled={disabled || reordering || !canMoveRight}
-            onClick={onMoveRight}
-            aria-label="Move later"
+            variant="outline"
+            size="xs"
+            className="text-destructive hover:text-destructive"
+            disabled={busy}
+            onClick={onRemove}
           >
-            <ArrowRight className="size-3.5" />
+            <Trash2 className="size-3" />
+            Remove
           </Button>
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-7 w-full text-xs text-white hover:bg-white/10 hover:text-white"
-          disabled={disabled || settingThumbnail || removing || reordering}
-          onClick={onSetThumbnail}
-        >
-          {isThumbnail ? "Unset" : "Set thumbnail"}
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-7 w-full text-xs text-white hover:bg-white/10 hover:text-white"
-          disabled={disabled || removing || settingThumbnail || reordering}
-          onClick={onRemove}
-        >
-          Remove
-        </Button>
-      </div>
+      )}
     </div>
   )
 }
 
 type ProductMediaGalleryProps = {
-  images: AdminProductImage[]
+  images: ProductMediaItem[]
   isUploading: boolean
   isRemoving: boolean
   isSettingThumbnail?: boolean
-  isReordering?: boolean
   disabled?: boolean
+  compact?: boolean
+  readOnly?: boolean
+  mediaPathPrefix?: string
   onUpload: (file: File, altText?: string) => void
   onRemove: (mediaId: string) => void
   onSetThumbnail: (mediaId: string, isThumbnail: boolean) => void
-  onReorder?: (mediaId: string, swapWithMediaId: string) => void
 }
 
 export function ProductMediaGallery({
@@ -128,19 +184,38 @@ export function ProductMediaGallery({
   isUploading,
   isRemoving,
   isSettingThumbnail = false,
-  isReordering = false,
   disabled = false,
+  compact = false,
+  readOnly = false,
+  mediaPathPrefix = DEFAULT_MEDIA_PATH_PREFIX,
   onUpload,
   onRemove,
   onSetThumbnail,
-  onReorder,
 }: ProductMediaGalleryProps) {
   const [altText, setAltText] = useState("")
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const ordered = [...images].sort((a, b) => {
     if (a.isThumbnail !== b.isThumbnail) return a.isThumbnail ? -1 : 1
     return (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
   })
+
+  useEffect(() => {
+    if (images.length === 0) {
+      setSelectedId(null)
+      return
+    }
+    setSelectedId((current) => {
+      if (current && images.some((image) => image.id === current)) return current
+      const sorted = [...images].sort((a, b) => {
+        if (a.isThumbnail !== b.isThumbnail) return a.isThumbnail ? -1 : 1
+        return (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
+      })
+      return sorted[0]?.id ?? null
+    })
+  }, [images])
+
+  const selected = ordered.find((image) => image.id === selectedId) ?? ordered[0]
 
   function handleFiles(fileList: FileList | null) {
     if (!fileList || fileList.length === 0) return
@@ -148,81 +223,77 @@ export function ProductMediaGallery({
     Array.from(fileList).forEach((file) => onUpload(file, alt))
   }
 
+  const dropDisabled = disabled || isUploading
+
   return (
-    <div className="flex flex-col gap-4">
-      {ordered.length > 0 ? (
-        <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap gap-3">
-            {ordered.map((image, index) => (
-              <MediaThumb
-                key={image.id}
-                mediaId={image.id}
-                alt={image.altText ?? "Product image"}
-                isThumbnail={Boolean(image.isThumbnail)}
-                canMoveLeft={Boolean(onReorder) && index > 0}
-                canMoveRight={Boolean(onReorder) && index < ordered.length - 1}
-                removing={isRemoving}
-                settingThumbnail={isSettingThumbnail}
-                reordering={isReordering}
-                disabled={disabled}
-                onRemove={() => onRemove(image.id)}
-                onSetThumbnail={() =>
-                  onSetThumbnail(image.id, !image.isThumbnail)
-                }
-                onMoveLeft={() => {
-                  const prev = ordered[index - 1]
-                  if (prev && onReorder) onReorder(image.id, prev.id)
-                }}
-                onMoveRight={() => {
-                  const next = ordered[index + 1]
-                  if (next && onReorder) onReorder(image.id, next.id)
-                }}
-              />
-            ))}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            The first uploaded image becomes the thumbnail automatically. Use
-            arrows to reorder the gallery.
-          </p>
-        </div>
+    <div className={cn("flex flex-col", compact ? "gap-2.5" : "gap-3")}>
+      {selected ? (
+        <MediaPreview
+          mediaId={selected.id}
+          alt={selected.altText ?? "Product image"}
+          isThumbnail={Boolean(selected.isThumbnail)}
+          removing={isRemoving}
+          settingThumbnail={isSettingThumbnail}
+          disabled={disabled}
+          compact={compact}
+          readOnly={readOnly}
+          mediaPathPrefix={mediaPathPrefix}
+          onRemove={() => onRemove(selected.id)}
+          onSetThumbnail={() =>
+            onSetThumbnail(selected.id, !selected.isThumbnail)
+          }
+        />
       ) : null}
 
-      <Field>
-        <FieldLabel htmlFor="media-alt-text">Alt text (optional)</FieldLabel>
-        <Input
-          id="media-alt-text"
-          value={altText}
-          onChange={(e) => setAltText(e.target.value)}
-          disabled={disabled || isUploading}
-          placeholder="Describe the image for accessibility"
-        />
-        <p className="mt-1.5 text-xs text-muted-foreground">
-          Applied to the next upload(s). Leave blank to skip.
+      {ordered.length > 0 ? (
+        <div className="-mx-0.5 flex gap-1.5 overflow-x-auto px-0.5 py-0.5">
+          {ordered.map((image) => (
+            <MediaThumb
+              key={image.id}
+              mediaId={image.id}
+              alt={image.altText ?? "Product image"}
+              isThumbnail={Boolean(image.isThumbnail)}
+              selected={image.id === selected?.id}
+              compact={compact}
+              mediaPathPrefix={mediaPathPrefix}
+              onSelect={() => setSelectedId(image.id)}
+            />
+          ))}
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          {readOnly
+            ? "No images for this product."
+            : "No images yet. Upload product photos to show them here."}
         </p>
-      </Field>
+      )}
 
+      {readOnly ? null : (
+      <>
       <label
-        className={
-          disabled || isUploading
-            ? "flex cursor-not-allowed flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border/80 bg-muted/30 px-6 py-10 text-center opacity-60"
-            : "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border/80 bg-muted/20 px-6 py-10 text-center transition-colors hover:border-border hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
-        }
+        className={cn(
+          "flex items-center justify-center gap-2 rounded-lg border border-dashed border-border/80 bg-muted/20 text-center transition-colors",
+          ordered.length === 0 ? "flex-col px-4 py-6" : "px-3 py-2.5",
+          dropDisabled
+            ? "cursor-not-allowed opacity-60"
+            : "cursor-pointer hover:border-border hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
+        )}
         onDragOver={(e) => {
           e.preventDefault()
         }}
         onDrop={(e) => {
           e.preventDefault()
-          if (disabled || isUploading) return
+          if (dropDisabled) return
           handleFiles(e.dataTransfer.files)
         }}
       >
-        <Upload className="size-5 text-muted-foreground" />
-        <div>
-          <p className="text-sm font-medium">
+        <Upload className="size-4 shrink-0 text-muted-foreground" />
+        <div className="min-w-0">
+          <p className="text-sm font-medium leading-tight">
             {isUploading ? "Uploading..." : "Upload images"}
           </p>
           <p className="text-xs text-muted-foreground">
-            Drag and drop images here or click to upload (multiple allowed)
+            Drag and drop or click to upload
           </p>
         </div>
         <input
@@ -230,13 +301,24 @@ export function ProductMediaGallery({
           accept="image/*"
           multiple
           className="sr-only"
-          disabled={disabled || isUploading}
+          disabled={dropDisabled}
           onChange={(e) => {
             handleFiles(e.target.files)
             e.target.value = ""
           }}
         />
       </label>
+
+      <Input
+        id="media-alt-text"
+        value={altText}
+        onChange={(e) => setAltText(e.target.value)}
+        disabled={dropDisabled}
+        placeholder="Alt text for next upload (optional)"
+        aria-label="Alt text for next upload"
+      />
+      </>
+      )}
     </div>
   )
 }

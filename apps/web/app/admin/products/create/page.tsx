@@ -16,7 +16,7 @@ import {
   parseCreateProductStep,
   type CreateProductStepId,
 } from "@/components/admin/products/product-steps"
-import { PermissionGate } from "@/components/admin/permission-gate"
+import { PermissionGate, useAdminPermissions } from "@/components/admin/permission-gate"
 import { RowActionsMenu } from "@/components/row-actions-menu"
 import { Button } from "@/components/ui/button"
 import {
@@ -27,22 +27,10 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { ApiError } from "@/lib/api"
-import { listAdminCategories } from "@/lib/api/admin/categories"
 import { getAdminInventory } from "@/lib/api/admin/inventory"
-import {
-  createAdminProduct,
-  createAdminVariant,
-  deleteAdminProductMedia,
-  deleteAdminVariant,
-  getAdminProduct,
-  setAdminProductMediaThumbnail,
-  updateAdminProduct,
-  updateAdminProductMedia,
-  updateAdminVariant,
-  uploadAdminProductMedia,
-  type AdminVariant,
-  type ProductStatus,
-} from "@/lib/api/admin/products"
+import { type AdminVariant, type ProductStatus } from "@/lib/api/admin/products"
+import { productMediaPath, storeCatalog } from "@/lib/api/store-catalog"
+import { isPlatformScope } from "@/lib/permissions"
 import { slugify } from "@/lib/format"
 import { formatPaise } from "@/lib/money"
 import { paiseToRupeesInput, rupeesToPaise } from "@/lib/money-input"
@@ -67,6 +55,10 @@ function CreateProductPageContent() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const queryClient = useQueryClient()
+  const { permissions } = useAdminPermissions()
+  const platform = isPlatformScope(permissions)
+  const catalogStoreId = platform ? searchParams.get("storeId") : null
+  const catalog = storeCatalog({ storeId: catalogStoreId })
 
   const currentStep = parseCreateProductStep(searchParams.get("step"))
   const urlProductId = searchParams.get("id")
@@ -93,14 +85,15 @@ function CreateProductPageContent() {
   const [allowZeroStockPublish, setAllowZeroStockPublish] = useState(false)
 
   const productQuery = useQuery({
-    queryKey: ["admin", "products", productId],
-    queryFn: () => getAdminProduct(productId!),
-    enabled: Boolean(productId),
+    queryKey: ["admin", "products", catalogStoreId, productId],
+    queryFn: () => catalog.getProduct(productId!),
+    enabled: Boolean(productId) && (!platform || Boolean(catalogStoreId)),
   })
 
   const categoriesQuery = useQuery({
-    queryKey: ["admin", "categories"],
-    queryFn: () => listAdminCategories({ pageSize: 100 }),
+    queryKey: ["admin", "categories", catalogStoreId],
+    queryFn: () => catalog.listCategories(),
+    enabled: !platform || Boolean(catalogStoreId),
   })
 
   useEffect(() => {
@@ -121,6 +114,7 @@ function CreateProductPageContent() {
   function setStep(step: CreateProductStepId, id?: string | null) {
     const next = new URLSearchParams()
     next.set("step", String(step))
+    if (catalogStoreId) next.set("storeId", catalogStoreId)
     const resolvedId = id ?? productId
     if (resolvedId) {
       next.set("id", resolvedId)
@@ -198,7 +192,7 @@ function CreateProductPageContent() {
       )
     }
 
-    const product = await createAdminProduct({
+    const product = await catalog.createProduct({
       ...parsed.data,
       shortDescription: parsed.data.shortDescription || undefined,
       description: parsed.data.description || undefined,
@@ -218,7 +212,7 @@ function CreateProductPageContent() {
       }
 
       if (productId) {
-        return updateAdminProduct(productId, {
+        return catalog.updateProduct(productId, {
           ...parsed.data,
           shortDescription: parsed.data.shortDescription || null,
           description: parsed.data.description || null,
@@ -226,7 +220,7 @@ function CreateProductPageContent() {
         })
       }
 
-      return createAdminProduct({
+      return catalog.createProduct({
         ...parsed.data,
         shortDescription: parsed.data.shortDescription || undefined,
         description: parsed.data.description || undefined,
@@ -245,7 +239,7 @@ function CreateProductPageContent() {
   const saveOrganizeMutation = useMutation({
     mutationFn: async () => {
       if (!productId) throw new Error("Create product details first.")
-      return updateAdminProduct(productId, {
+      return catalog.updateProduct(productId, {
         categoryId: categoryId || null,
         status,
       })
@@ -265,7 +259,7 @@ function CreateProductPageContent() {
       compareAtPricePaise?: number | null
       initialQuantity?: number
       status: ProductStatus
-    }) => createAdminVariant(productId!, input),
+    }) => catalog.createVariant(productId!, input),
     onSuccess: async () => {
       resetVariantForm()
       setError(null)
@@ -291,7 +285,7 @@ function CreateProductPageContent() {
       compareAtPricePaise?: number | null
       status: ProductStatus
     }) =>
-      updateAdminVariant(productId!, input.variantId, {
+      catalog.updateVariant(productId!, input.variantId, {
         sku: input.sku,
         title: input.title,
         pricePaise: input.pricePaise,
@@ -314,7 +308,7 @@ function CreateProductPageContent() {
 
   const deleteVariantMutation = useMutation({
     mutationFn: (variantId: string) =>
-      deleteAdminVariant(productId!, variantId),
+      catalog.deleteVariant(productId!, variantId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({
         queryKey: ["admin", "products", productId],
@@ -325,7 +319,7 @@ function CreateProductPageContent() {
   const uploadMutation = useMutation({
     mutationFn: async (input: { file: File; altText?: string }) => {
       const id = await ensureDraftProduct()
-      return uploadAdminProductMedia(id, input.file, input.altText)
+      return catalog.uploadMedia(id, input.file, input.altText)
     },
     onSuccess: async (image) => {
       setError(null)
@@ -345,7 +339,7 @@ function CreateProductPageContent() {
   })
 
   const deleteMediaMutation = useMutation({
-    mutationFn: deleteAdminProductMedia,
+    mutationFn: catalog.deleteMedia,
     onSuccess: async () => {
       if (!productId) return
       await queryClient.invalidateQueries({
@@ -361,7 +355,7 @@ function CreateProductPageContent() {
 
   const setThumbnailMutation = useMutation({
     mutationFn: (input: { mediaId: string; isThumbnail: boolean }) =>
-      setAdminProductMediaThumbnail(input.mediaId, input.isThumbnail),
+      catalog.setThumbnail(input.mediaId, input.isThumbnail),
     onSuccess: async () => {
       setError(null)
       if (!productId) return
@@ -379,28 +373,9 @@ function CreateProductPageContent() {
     },
   })
 
-  const reorderMediaMutation = useMutation({
-    mutationFn: (input: { mediaId: string; swapWithMediaId: string }) =>
-      updateAdminProductMedia(input.mediaId, {
-        swapWithMediaId: input.swapWithMediaId,
-      }),
-    onSuccess: async () => {
-      setError(null)
-      if (!productId) return
-      await queryClient.invalidateQueries({
-        queryKey: ["admin", "products", productId],
-      })
-    },
-    onError: (cause) => {
-      setError(
-        cause instanceof ApiError ? cause.message : "Failed to reorder images."
-      )
-    },
-  })
-
   const publishMutation = useMutation({
     mutationFn: () =>
-      updateAdminProduct(productId!, { status: "ACTIVE" }),
+      catalog.updateProduct(productId!, { status: "ACTIVE" }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["admin", "products"] })
       router.push("/admin/products")
@@ -436,13 +411,14 @@ function CreateProductPageContent() {
       })
       return
     }
-    await updateAdminProduct(productId, { status: "DRAFT" })
+    await catalog.updateProduct(productId, { status: "DRAFT" })
     setStatus("DRAFT")
     setError(null)
     await queryClient.invalidateQueries({
       queryKey: ["admin", "products", productId],
     })
   }, [
+    catalog,
     currentStep,
     productId,
     queryClient,
@@ -666,7 +642,7 @@ function CreateProductPageContent() {
         },
         {
           onSuccess: async () => {
-            const refreshed = await getAdminProduct(productId)
+            const refreshed = await catalog.getProduct(productId)
             await publishWithGuards(refreshed.variants ?? [])
           },
         }
@@ -680,6 +656,7 @@ function CreateProductPageContent() {
     if (currentStep > 1 && !productId) {
       const next = new URLSearchParams()
       next.set("step", "1")
+      if (catalogStoreId) next.set("storeId", catalogStoreId)
       router.replace(`${pathname}?${next.toString()}`)
     }
   }, [currentStep, productId, pathname, router])
@@ -693,7 +670,6 @@ function CreateProductPageContent() {
     uploadMutation.isPending ||
     deleteMediaMutation.isPending ||
     setThumbnailMutation.isPending ||
-    reorderMediaMutation.isPending ||
     publishMutation.isPending
 
   const categories = categoriesQuery.data?.data ?? []
@@ -704,6 +680,23 @@ function CreateProductPageContent() {
     media: images.length > 0,
     category: Boolean(categoryId),
     variants: variants.length > 0,
+  }
+
+  if (platform && !catalogStoreId) {
+    return (
+      <div className="flex flex-col gap-4">
+        <p className="text-sm text-destructive">
+          Select a store on the Products page before creating a product.
+        </p>
+        <Button
+          nativeButton={false}
+          variant="outline"
+          render={<GuardedLink href="/admin/products" />}
+        >
+          Back to products
+        </Button>
+      </div>
+    )
   }
 
   return (
@@ -864,15 +857,14 @@ function CreateProductPageContent() {
               </div>
               <ProductMediaGallery
                 images={images}
+                mediaPathPrefix={productMediaPath(catalogStoreId)}
                 isUploading={uploadMutation.isPending}
                 isRemoving={deleteMediaMutation.isPending}
                 isSettingThumbnail={setThumbnailMutation.isPending}
-                isReordering={reorderMediaMutation.isPending}
                 disabled={
                   saveDetailsMutation.isPending ||
                   deleteMediaMutation.isPending ||
-                  setThumbnailMutation.isPending ||
-                  reorderMediaMutation.isPending
+                  setThumbnailMutation.isPending
                 }
                 onUpload={(file, altText) =>
                   uploadMutation.mutate({ file, altText })
@@ -890,13 +882,6 @@ function CreateProductPageContent() {
                     return
                   }
                   setThumbnailMutation.mutate({ mediaId, isThumbnail })
-                }}
-                onReorder={(mediaId, swapWithMediaId) => {
-                  if (!productId) {
-                    setError("Save the product before reordering images.")
-                    return
-                  }
-                  reorderMediaMutation.mutate({ mediaId, swapWithMediaId })
                 }}
               />
             </div>

@@ -7,14 +7,10 @@ import {
 } from "@/modules/checkout/totals";
 import { requireStoreAdmin } from "@/middleware/require-admin";
 import { scheduleDbClose, useRequestDb } from "@/middleware/database";
-import { ProductService } from "@/modules/product/product.service";
 import {
-  createProductBodySchema,
-  listProductsQuerySchema,
-  updateProductBodySchema,
-} from "@/modules/product/product.schemas";
-import { VariantRepository } from "@/modules/variant/variant.repository";
-import { toVariantResponse } from "@/modules/variant/variant.types";
+  registerStoreProductRoutes,
+  resolveStoreIdFromAuth,
+} from "@/modules/product/product.store.routes";
 import { normalizeDiscountCode } from "@/modules/discount";
 import { AUDIT_ACTIONS, actorFromAuth, writeAuditLog } from "@/modules/audit";
 import {
@@ -58,6 +54,7 @@ import { SUCCESS_MESSAGES } from "@/shared/constants/success-messages";
 import { paginationQuerySchema } from "@/shared/pagination/pagination.schema";
 import { buildPaginationMeta, paginationOffset } from "@/shared/pagination/pagination";
 import type { AppEnv } from "@/shared/types/hono";
+import { registerAdminGlobalCatalogRoutes } from "@/modules/global-catalog/global-catalog.admin.routes";
 
 const STOCK_RESTORABLE_STATUSES = new Set([
   "PENDING",
@@ -161,181 +158,7 @@ function toAdminStoreSettingsDto(
 export function createAdminRoutes() {
   const app = new Hono<AppEnv>();
   app.use("*", requireStoreAdmin());
-
-  app.get("/products", async (c) => {
-    const parsed = listProductsQuerySchema.safeParse(c.req.query());
-    if (!parsed.success) throw new ValidationError("Invalid query.", parsed.error.flatten());
-    const { db, opened } = await useRequestDb(c);
-    if (opened) scheduleDbClose(c, opened);
-    const storeId = storeIdFromAuth(c);
-    const result = await new ProductService(db).listForStore(storeId, parsed.data);
-    const { MediaService } = await import("@/modules/media/media.service");
-    const thumbnails = await new MediaService(db).thumbnailsForProducts(
-      storeId,
-      result.items.map((item) => item.id),
-    );
-    const items = result.items.map((item) => {
-      const thumb = thumbnails.get(item.id);
-      return {
-        ...item,
-        thumbnail: thumb
-          ? { id: thumb.id, altText: thumb.altText, url: thumb.url }
-          : null,
-      };
-    });
-    return sendSuccess(c, items, {
-      message: SUCCESS_MESSAGES.PRODUCTS_RETRIEVED,
-      pagination: {
-        page: result.page,
-        pageSize: result.pageSize,
-        total: result.total,
-        totalPages: Math.ceil(result.total / result.pageSize) || 1,
-      },
-    });
-  });
-
-  app.post("/products", async (c) => {
-    const parsed = createProductBodySchema.safeParse(await c.req.json());
-    if (!parsed.success) throw new ValidationError("Invalid product.", parsed.error.flatten());
-    const { db, opened } = await useRequestDb(c);
-    if (opened) scheduleDbClose(c, opened);
-    const product = await new ProductService(db).create(storeIdFromAuth(c), parsed.data);
-    return sendSuccess(c, product, {
-      message: SUCCESS_MESSAGES.PRODUCT_CREATED,
-      status: HTTP_STATUS.CREATED,
-    });
-  });
-
-  app.get("/products/:productId", async (c) => {
-    const { db, opened } = await useRequestDb(c);
-    if (opened) scheduleDbClose(c, opened);
-    const storeId = storeIdFromAuth(c);
-    const product = await new ProductService(db).getForStore(storeId, c.req.param("productId"));
-    const variants = await new VariantRepository(db).listByProduct(storeId, product.id);
-    const { MediaService } = await import("@/modules/media/media.service");
-    const images = await new MediaService(db).listByProduct(storeId, product.id);
-    return sendSuccess(
-      c,
-      {
-        ...product,
-        variants: variants.map((v) => toVariantResponse(v)),
-        images,
-      },
-      { message: SUCCESS_MESSAGES.PRODUCT_RETRIEVED },
-    );
-  });
-
-  app.patch("/products/:productId", async (c) => {
-    const parsed = updateProductBodySchema.safeParse(await c.req.json());
-    if (!parsed.success) throw new ValidationError("Invalid product.", parsed.error.flatten());
-    const { db, opened } = await useRequestDb(c);
-    if (opened) scheduleDbClose(c, opened);
-    const product = await new ProductService(db).update(
-      storeIdFromAuth(c),
-      c.req.param("productId"),
-      parsed.data,
-    );
-    return sendSuccess(c, product, { message: SUCCESS_MESSAGES.PRODUCT_UPDATED });
-  });
-
-  app.delete("/products/:productId", async (c) => {
-    const { db, opened } = await useRequestDb(c);
-    if (opened) scheduleDbClose(c, opened);
-    const storeId = storeIdFromAuth(c);
-    const productId = c.req.param("productId");
-    await new ProductService(db).remove(storeId, productId);
-    const actor = actorFromAuth(c.get("auth"));
-    await writeAuditLog(db, {
-      storeId,
-      actorUserId: actor.actorUserId,
-      action: AUDIT_ACTIONS.PRODUCT_DELETE,
-      resourceType: "product",
-      resourceId: productId,
-    });
-    return sendSuccess(c, { deleted: true }, { message: SUCCESS_MESSAGES.PRODUCT_DELETED });
-  });
-
-  const variantBody = z.object({
-    sku: z.string().min(1),
-    title: z.string().min(1),
-    pricePaise: z.number().int().nonnegative(),
-    compareAtPricePaise: z.number().int().nonnegative().nullable().optional(),
-    status: z.enum(["DRAFT", "ACTIVE", "ARCHIVED"]).optional(),
-    /** Initial on-hand qty when creating a variant (ignored on PATCH). */
-    initialQuantity: z.number().int().nonnegative().optional(),
-  });
-
-  app.get("/products/:productId/variants", async (c) => {
-    const { db, opened } = await useRequestDb(c);
-    if (opened) scheduleDbClose(c, opened);
-    const variants = await new VariantRepository(db).listByProduct(
-      storeIdFromAuth(c),
-      c.req.param("productId"),
-    );
-    return sendSuccess(c, variants.map((v) => toVariantResponse(v)), {
-      message: SUCCESS_MESSAGES.VARIANTS_RETRIEVED,
-    });
-  });
-
-  app.post("/products/:productId/variants", async (c) => {
-    const parsed = variantBody.safeParse(await c.req.json());
-    if (!parsed.success) throw new ValidationError("Invalid variant.", parsed.error.flatten());
-    const { db, opened } = await useRequestDb(c);
-    if (opened) scheduleDbClose(c, opened);
-    const storeId = storeIdFromAuth(c);
-    await new ProductService(db).getForStore(storeId, c.req.param("productId"));
-    const repo = new VariantRepository(db);
-    const { initialQuantity = 0, ...variantInput } = parsed.data;
-    const existing = await repo.findBySku(storeId, variantInput.sku);
-    if (existing) throw new DuplicateResourceError("SKU already exists.");
-    const variant = await repo.create(storeId, c.req.param("productId"), variantInput);
-    await db.insert(inventory).values({
-      storeId,
-      variantId: variant.id,
-      availableQuantity: initialQuantity,
-      reservedQuantity: 0,
-    });
-    if (initialQuantity > 0) {
-      await db.insert(inventoryMovements).values({
-        storeId,
-        variantId: variant.id,
-        type: "ADJUSTMENT",
-        quantity: initialQuantity,
-        reference: "Initial stock on variant create",
-      });
-    }
-    return sendSuccess(c, toVariantResponse(variant), {
-      message: SUCCESS_MESSAGES.VARIANT_CREATED,
-      status: HTTP_STATUS.CREATED,
-    });
-  });
-
-  app.patch("/products/:productId/variants/:variantId", async (c) => {
-    const parsed = variantBody.omit({ initialQuantity: true }).partial().safeParse(await c.req.json());
-    if (!parsed.success) throw new ValidationError("Invalid variant.", parsed.error.flatten());
-    const { db, opened } = await useRequestDb(c);
-    if (opened) scheduleDbClose(c, opened);
-    const variant = await new VariantRepository(db).update(
-      storeIdFromAuth(c),
-      c.req.param("variantId"),
-      parsed.data,
-    );
-    if (!variant) throw new NotFoundError("Variant not found.");
-    return sendSuccess(c, toVariantResponse(variant), {
-      message: SUCCESS_MESSAGES.VARIANT_UPDATED,
-    });
-  });
-
-  app.delete("/products/:productId/variants/:variantId", async (c) => {
-    const { db, opened } = await useRequestDb(c);
-    if (opened) scheduleDbClose(c, opened);
-    const deleted = await new VariantRepository(db).delete(
-      storeIdFromAuth(c),
-      c.req.param("variantId"),
-    );
-    if (!deleted) throw new NotFoundError("Variant not found.");
-    return sendSuccess(c, { deleted: true }, { message: SUCCESS_MESSAGES.VARIANT_DELETED });
-  });
+  registerStoreProductRoutes(app, resolveStoreIdFromAuth);
 
   // Categories
   app.get("/categories", async (c) => {
@@ -529,44 +352,94 @@ export function createAdminRoutes() {
     const { db, opened } = await useRequestDb(c);
     if (opened) scheduleDbClose(c, opened);
     const storeId = storeIdFromAuth(c);
-    const clauses: SQL[] = [eq(inventory.storeId, storeId)];
-    if (q) {
-      const pattern = `%${q}%`;
-      clauses.push(
-        sql`(${ilike(products.title, pattern)} or ${ilike(productVariants.title, pattern)} or ${ilike(productVariants.sku, pattern)})`,
-      );
+
+    const { globalProductVariants } = await import("@/db/schema/global-product-variants");
+    const { globalProducts } = await import("@/db/schema/global-products");
+    const { findSellableVariant } = await import(
+      "@/modules/global-catalog/sellable-variant"
+    );
+
+    const inventoryRows = await db
+      .select()
+      .from(inventory)
+      .where(eq(inventory.storeId, storeId))
+      .orderBy(desc(inventory.updatedAt));
+
+    const enriched = [];
+    for (const row of inventoryRows) {
+      const sellable = await findSellableVariant(db, storeId, row.variantId);
+      let sku = sellable?.sku ?? null;
+      let variantName = sellable?.title ?? null;
+      let productName = sellable?.productTitle ?? null;
+      let productId = sellable?.productId ?? null;
+      let source = row.source;
+
+      if (!sellable && row.source === "GLOBAL") {
+        const [g] = await db
+          .select({
+            sku: globalProductVariants.sku,
+            variantName: globalProductVariants.title,
+            productName: globalProducts.title,
+            productId: globalProducts.id,
+          })
+          .from(globalProductVariants)
+          .innerJoin(globalProducts, eq(globalProductVariants.productId, globalProducts.id))
+          .where(eq(globalProductVariants.id, row.variantId))
+          .limit(1);
+        if (g) {
+          sku = g.sku;
+          variantName = g.variantName;
+          productName = g.productName;
+          productId = g.productId;
+        }
+      } else if (!sellable) {
+        const [local] = await db
+          .select({
+            sku: productVariants.sku,
+            variantName: productVariants.title,
+            productName: products.title,
+            productId: products.id,
+          })
+          .from(productVariants)
+          .innerJoin(products, eq(productVariants.productId, products.id))
+          .where(eq(productVariants.id, row.variantId))
+          .limit(1);
+        if (local) {
+          sku = local.sku;
+          variantName = local.variantName;
+          productName = local.productName;
+          productId = local.productId;
+        }
+      }
+
+      if (q) {
+        const pattern = q.toLowerCase();
+        const hay = `${productName ?? ""} ${variantName ?? ""} ${sku ?? ""}`.toLowerCase();
+        if (!hay.includes(pattern)) continue;
+      }
+
+      enriched.push({
+        id: row.id,
+        variantId: row.variantId,
+        availableQuantity: row.availableQuantity,
+        reservedQuantity: row.reservedQuantity,
+        updatedAt: row.updatedAt,
+        sku,
+        variantName,
+        productName,
+        productId,
+        source,
+      });
     }
-    const where = and(...clauses);
-    const [rows, totalRow] = await Promise.all([
-      db
-        .select({
-          id: inventory.id,
-          variantId: inventory.variantId,
-          availableQuantity: inventory.availableQuantity,
-          reservedQuantity: inventory.reservedQuantity,
-          updatedAt: inventory.updatedAt,
-          sku: productVariants.sku,
-          variantName: productVariants.title,
-          productName: products.title,
-          productId: products.id,
-        })
-        .from(inventory)
-        .innerJoin(productVariants, eq(inventory.variantId, productVariants.id))
-        .innerJoin(products, eq(productVariants.productId, products.id))
-        .where(where)
-        .orderBy(desc(inventory.updatedAt))
-        .limit(pageSize)
-        .offset(paginationOffset(page, pageSize)),
-      db
-        .select({ total: count() })
-        .from(inventory)
-        .innerJoin(productVariants, eq(inventory.variantId, productVariants.id))
-        .innerJoin(products, eq(productVariants.productId, products.id))
-        .where(where),
-    ]);
-    return sendSuccess(c, rows, {
+
+    const total = enriched.length;
+    const pageRows = enriched.slice(
+      paginationOffset(page, pageSize),
+      paginationOffset(page, pageSize) + pageSize,
+    );
+    return sendSuccess(c, pageRows, {
       message: SUCCESS_MESSAGES.INVENTORY_RETRIEVED,
-      pagination: buildPaginationMeta(page, pageSize, Number(totalRow[0]?.total ?? 0)),
+      pagination: buildPaginationMeta(page, pageSize, total),
     });
   });
 
@@ -574,25 +447,30 @@ export function createAdminRoutes() {
     const { db, opened } = await useRequestDb(c);
     if (opened) scheduleDbClose(c, opened);
     const storeId = storeIdFromAuth(c);
-    const [item] = await db
-      .select({
-        id: inventory.id,
-        variantId: inventory.variantId,
-        availableQuantity: inventory.availableQuantity,
-        reservedQuantity: inventory.reservedQuantity,
-        updatedAt: inventory.updatedAt,
-        sku: productVariants.sku,
-        variantName: productVariants.title,
-        productName: products.title,
-        productId: products.id,
-      })
-      .from(inventory)
-      .innerJoin(productVariants, eq(inventory.variantId, productVariants.id))
-      .innerJoin(products, eq(productVariants.productId, products.id))
-      .where(and(eq(inventory.storeId, storeId), eq(inventory.variantId, c.req.param("variantId"))))
-      .limit(1);
-    if (!item) throw new NotFoundError("Inventory not found.");
-    return sendSuccess(c, item, { message: SUCCESS_MESSAGES.INVENTORY_ITEM_RETRIEVED });
+    const row = await db.query.inventory.findFirst({
+      where: and(eq(inventory.storeId, storeId), eq(inventory.variantId, c.req.param("variantId"))),
+    });
+    if (!row) throw new NotFoundError("Inventory not found.");
+    const { findSellableVariant } = await import(
+      "@/modules/global-catalog/sellable-variant"
+    );
+    const sellable = await findSellableVariant(db, storeId, row.variantId);
+    return sendSuccess(
+      c,
+      {
+        id: row.id,
+        variantId: row.variantId,
+        availableQuantity: row.availableQuantity,
+        reservedQuantity: row.reservedQuantity,
+        updatedAt: row.updatedAt,
+        sku: sellable?.sku ?? null,
+        variantName: sellable?.title ?? null,
+        productName: sellable?.productTitle ?? null,
+        productId: sellable?.productId ?? null,
+        source: row.source,
+      },
+      { message: SUCCESS_MESSAGES.INVENTORY_ITEM_RETRIEVED },
+    );
   });
 
   app.get("/inventory/:variantId/movements", async (c) => {
@@ -648,6 +526,7 @@ export function createAdminRoutes() {
     await db.insert(inventoryMovements).values({
       storeId,
       variantId,
+      source: existing.source,
       type: "ADJUSTMENT",
       quantity: body.data.delta,
       reference: body.data.reason ?? null,
@@ -689,6 +568,7 @@ export function createAdminRoutes() {
     await db.insert(inventoryMovements).values({
       storeId,
       variantId,
+      source: existing.source,
       type: "ADJUSTMENT",
       quantity: delta,
       reference: body.data.reason ?? "set-quantity",
@@ -1560,145 +1440,7 @@ export function createAdminRoutes() {
     });
   });
 
-  // Media (R2)
-  app.get("/products/:productId/media", async (c) => {
-    const { db, opened } = await useRequestDb(c);
-    if (opened) scheduleDbClose(c, opened);
-    const { MediaService } = await import("@/modules/media/media.service");
-    const images = await new MediaService(db).listByProduct(
-      storeIdFromAuth(c),
-      c.req.param("productId"),
-    );
-    return sendSuccess(c, images, { message: SUCCESS_MESSAGES.MEDIA_RETRIEVED });
-  });
-
-  app.post("/media/upload", async (c) => {
-    const storeId = storeIdFromAuth(c);
-    const bucket = c.env.PRODUCT_MEDIA;
-    if (!bucket) throw new ValidationError("Media storage is not configured.");
-
-    const form = await c.req.parseBody();
-    const productId = typeof form.productId === "string" ? form.productId : "";
-    const file = form.file;
-    if (!productId || !(file instanceof File)) {
-      throw new ValidationError("productId and file are required.");
-    }
-
-    const { db, opened } = await useRequestDb(c);
-    if (opened) scheduleDbClose(c, opened);
-    await new ProductService(db).getForStore(storeId, productId);
-
-    const {
-      buildProductMediaKey,
-      putObject,
-      toR2Url,
-    } = await import("@/infrastructure/r2/product-media");
-    const storageKey = buildProductMediaKey({
-      storeId,
-      productId,
-      filename: file.name || "upload.bin",
-    });
-    const contentType = file.type || "application/octet-stream";
-    await putObject(bucket, storageKey, await file.arrayBuffer(), contentType);
-
-    const { MediaService } = await import("@/modules/media/media.service");
-    const altText = typeof form.altText === "string" ? form.altText : null;
-    const media = await new MediaService(db).create(storeId, productId, {
-      storageKey,
-      url: toR2Url(storageKey),
-      altText,
-    });
-    return sendSuccess(c, media, {
-      message: SUCCESS_MESSAGES.MEDIA_UPLOADED,
-      status: HTTP_STATUS.CREATED,
-    });
-  });
-
-  app.get("/media/:mediaId", async (c) => {
-    const storeId = storeIdFromAuth(c);
-    const { db, opened } = await useRequestDb(c);
-    if (opened) scheduleDbClose(c, opened);
-    const { MediaService } = await import("@/modules/media/media.service");
-    const media = await new MediaService(db).getById(storeId, c.req.param("mediaId"));
-    const bucket = c.env.PRODUCT_MEDIA;
-    if (!bucket) throw new NotFoundError("Media storage is not configured.");
-    const { getObject } = await import("@/infrastructure/r2/product-media");
-    const object = await getObject(bucket, media.storageKey);
-    if (!object?.body) throw new NotFoundError("Media object not found.");
-    return new Response(object.body, {
-      headers: {
-        "Content-Type": object.httpMetadata?.contentType ?? "application/octet-stream",
-        "Cache-Control": "private, max-age=60",
-      },
-    });
-  });
-
-  app.post("/media/:mediaId/thumbnail", async (c) => {
-    const storeId = storeIdFromAuth(c);
-    const body = z
-      .object({ isThumbnail: z.boolean().optional().default(true) })
-      .safeParse(await c.req.json().catch(() => ({})));
-    if (!body.success) throw new ValidationError("Invalid body.", body.error.flatten());
-
-    const { db, opened } = await useRequestDb(c);
-    if (opened) scheduleDbClose(c, opened);
-    const { MediaService } = await import("@/modules/media/media.service");
-    const media = await new MediaService(db).setThumbnail(
-      storeId,
-      c.req.param("mediaId"),
-      body.data.isThumbnail,
-    );
-    return sendSuccess(c, media, { message: SUCCESS_MESSAGES.MEDIA_THUMBNAIL_UPDATED });
-  });
-
-  app.patch("/media/:mediaId", async (c) => {
-    const storeId = storeIdFromAuth(c);
-    const body = z
-      .object({
-        altText: z.string().trim().max(500).nullable().optional(),
-        sortOrder: z.number().int().nonnegative().optional(),
-        swapWithMediaId: z.string().uuid().optional(),
-      })
-      .safeParse(await c.req.json());
-    if (!body.success) throw new ValidationError("Invalid media update.", body.error.flatten());
-    if (
-      body.data.altText === undefined &&
-      body.data.sortOrder === undefined &&
-      body.data.swapWithMediaId === undefined
-    ) {
-      throw new ValidationError("Provide altText, sortOrder, or swapWithMediaId.");
-    }
-
-    const { db, opened } = await useRequestDb(c);
-    if (opened) scheduleDbClose(c, opened);
-    const { MediaService } = await import("@/modules/media/media.service");
-    const service = new MediaService(db);
-
-    if (body.data.swapWithMediaId) {
-      await service.swapSortOrder(storeId, c.req.param("mediaId"), body.data.swapWithMediaId);
-      const media = await service.getById(storeId, c.req.param("mediaId"));
-      return sendSuccess(c, media, { message: SUCCESS_MESSAGES.MEDIA_UPDATED });
-    }
-
-    const media = await service.update(storeId, c.req.param("mediaId"), {
-      altText: body.data.altText,
-      sortOrder: body.data.sortOrder,
-    });
-    return sendSuccess(c, media, { message: SUCCESS_MESSAGES.MEDIA_UPDATED });
-  });
-
-  app.delete("/media/:mediaId", async (c) => {
-    const storeId = storeIdFromAuth(c);
-    const { db, opened } = await useRequestDb(c);
-    if (opened) scheduleDbClose(c, opened);
-    const { MediaService } = await import("@/modules/media/media.service");
-    const media = await new MediaService(db).remove(storeId, c.req.param("mediaId"));
-    if (c.env.PRODUCT_MEDIA && media.storageKey) {
-      const { deleteObject } = await import("@/infrastructure/r2/product-media");
-      await deleteObject(c.env.PRODUCT_MEDIA, media.storageKey);
-    }
-    return sendSuccess(c, { deleted: true }, { message: SUCCESS_MESSAGES.MEDIA_DELETED });
-  });
+  registerAdminGlobalCatalogRoutes(app);
 
   return app;
 }

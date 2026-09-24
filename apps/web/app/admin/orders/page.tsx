@@ -1,5 +1,8 @@
 "use client"
 
+import { Suspense } from "react"
+
+import { DataTableSkeleton } from "@/components/admin/data-table-skeleton"
 import { PermissionGate } from "@/components/admin/permission-gate"
 import { RoleSwitch } from "@/components/admin/role-switch"
 import { PlatformOrders } from "@/components/admin/views/platform-orders"
@@ -8,7 +11,9 @@ import { StoreOrders } from "@/components/admin/views/store-orders"
 export default function AdminOrdersPage() {
   return (
     <PermissionGate permission="orders.read">
-      <RoleSwitch platform={<PlatformOrders />} store={<StoreOrders />} />
+      <Suspense fallback={<DataTableSkeleton columns={6} rows={8} />}>
+        <RoleSwitch platform={<PlatformOrders />} store={<StoreOrders />} />
+      </Suspense>
     </PermissionGate>
   )
 }

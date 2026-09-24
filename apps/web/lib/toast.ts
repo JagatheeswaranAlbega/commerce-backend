@@ -1,37 +1,48 @@
-import { toast as sonnerToast, type ExternalToast } from "sonner"
+import { toast } from "@/components/ui/toast"
 
-const DEFAULT_DURATION = 5000
+const DEFAULT_TIMEOUT = 3500
 
-type ToastType = "success" | "error" | "warning" | "info" | "delete"
+type ToastType = "success" | "error" | "warning" | "info"
 
-const toastOptions = (
-  type: ToastType,
-  options?: ExternalToast
-): ExternalToast => ({
-  duration: DEFAULT_DURATION,
-  className: `toast-${type}`,
-  ...options,
-})
+type AppToastOptions = {
+  description?: string
+  timeout?: number
+  id?: string
+}
+
+function show(type: ToastType, message: string, options?: AppToastOptions) {
+  return toast.add({
+    id: options?.id ?? `${type}:${message}`,
+    type,
+    title: message,
+    description: options?.description,
+    timeout: options?.timeout ?? DEFAULT_TIMEOUT,
+    priority: type === "error" ? "high" : "low",
+  })
+}
 
 /**
- * App toast helpers — always auto-dismiss after 5s with consistent type styles.
+ * App toast helpers. Identical messages replace the existing toast
+ * instead of stacking a duplicate.
  */
 export const appToast = {
-  success(message: string, options?: ExternalToast) {
-    return sonnerToast.success(message, toastOptions("success", options))
+  success(message: string, options?: AppToastOptions) {
+    return show("success", message, options)
   },
-  error(message: string, options?: ExternalToast) {
-    return sonnerToast.error(message, toastOptions("error", options))
+  error(message: string, options?: AppToastOptions) {
+    return show("error", message, options)
   },
-  warning(message: string, options?: ExternalToast) {
-    return sonnerToast.warning(message, toastOptions("warning", options))
+  warning(message: string, options?: AppToastOptions) {
+    return show("warning", message, options)
   },
-  info(message: string, options?: ExternalToast) {
-    return sonnerToast.info(message, toastOptions("info", options))
+  info(message: string, options?: AppToastOptions) {
+    return show("info", message, options)
   },
-  /** Destructive / delete feedback — same visual language as error. */
-  delete(message: string, options?: ExternalToast) {
-    return sonnerToast.error(message, toastOptions("delete", options))
+  /** Destructive feedback uses the error toast type. */
+  delete(message: string, options?: AppToastOptions) {
+    return show("error", message, options)
   },
-  dismiss: sonnerToast.dismiss,
+  dismiss(id?: string) {
+    toast.close(id)
+  },
 }

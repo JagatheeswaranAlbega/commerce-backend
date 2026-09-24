@@ -1,12 +1,12 @@
 import type { LucideIcon } from "lucide-react"
 import {
   FolderTree,
+  Globe2,
   KeyRound,
   LayoutDashboard,
   Layers,
   Package,
   Percent,
-  RotateCcw,
   ScrollText,
   Settings,
   ShoppingBag,
@@ -89,6 +89,13 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     group: "catalog",
   },
   {
+    href: "/admin/global-catalog",
+    label: "Global Catalog",
+    icon: Globe2,
+    permission: "global_catalog.read",
+    group: "catalog",
+  },
+  {
     href: "/admin/categories",
     label: "Categories",
     icon: FolderTree,
@@ -113,13 +120,6 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     href: "/admin/orders",
     label: "Orders",
     icon: ShoppingBag,
-    permission: "orders.read",
-    group: "commerce",
-  },
-  {
-    href: "/admin/returns",
-    label: "Returns",
-    icon: RotateCcw,
     permission: "orders.read",
     group: "commerce",
   },

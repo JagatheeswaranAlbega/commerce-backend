@@ -26,7 +26,3 @@ coverage
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-
-# Windows Mark-of-the-Web alternate data streams
-*Zone.Identifier
-*:Zone.Identifier

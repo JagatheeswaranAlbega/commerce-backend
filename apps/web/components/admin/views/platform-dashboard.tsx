@@ -111,7 +111,7 @@ export function PlatformDashboard() {
           <CardDescription>Jump into common platform tasks</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2 pt-4">
-          <Link href="/admin/stores/new">
+          <Link href="/admin/stores">
             <Badge
               variant="secondary"
               className="h-7 cursor-pointer px-2.5 transition-colors hover:bg-muted"

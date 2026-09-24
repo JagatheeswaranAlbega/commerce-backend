@@ -1,5 +1,6 @@
 import { and, eq, isNull } from "drizzle-orm";
 import type { Context, Next } from "hono";
+import { stores } from "@/db/schema/stores";
 import { users } from "@/db/schema/users";
 import {
   ACCESS_TYPES,
@@ -9,7 +10,10 @@ import {
 import { extractBearerToken, verifyAuthToken } from "@/modules/auth/jwt";
 import { scheduleDbClose, useRequestDb } from "@/middleware/database";
 import { AUTHORIZATION_HEADER } from "@/shared/constants/headers";
-import { ForbiddenError, UnauthorizedError } from "@/shared/errors/app-error";
+import {
+  ForbiddenError,
+  UnauthorizedError,
+} from "@/shared/errors/app-error";
 import type { AppEnv } from "@/shared/types/hono";
 
 async function loadAdminAuth(c: Context<AppEnv>): Promise<RequestAuthContext> {
@@ -43,6 +47,12 @@ async function loadAdminAuth(c: Context<AppEnv>): Promise<RequestAuthContext> {
   if (user.role === USER_ROLES.STORE_ADMIN) {
     if (!user.storeId || user.storeId !== payload.storeId) {
       throw new ForbiddenError("Store scope mismatch.");
+    }
+    const store = await db.query.stores.findFirst({
+      where: eq(stores.id, user.storeId),
+    });
+    if (!store || store.status !== "ACTIVE") {
+      throw new ForbiddenError("This store has been deactivated.");
     }
     return {
       accessType: ACCESS_TYPES.STORE_ADMIN,

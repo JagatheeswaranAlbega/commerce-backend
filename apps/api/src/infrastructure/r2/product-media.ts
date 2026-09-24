@@ -82,3 +82,56 @@ export async function getObject(bucket: R2Bucket, key: string): Promise<R2Object
 export function toR2Url(storageKey: string): string {
   return `r2://${storageKey}`;
 }
+
+/** Detect common image MIME types from magic bytes (ignores filename / declared type). */
+export function sniffImageContentType(bytes: ArrayBuffer): string | null {
+  const u8 = new Uint8Array(bytes);
+  if (u8.length >= 3 && u8[0] === 0xff && u8[1] === 0xd8 && u8[2] === 0xff) {
+    return "image/jpeg";
+  }
+  if (
+    u8.length >= 8 &&
+    u8[0] === 0x89 &&
+    u8[1] === 0x50 &&
+    u8[2] === 0x4e &&
+    u8[3] === 0x47
+  ) {
+    return "image/png";
+  }
+  if (u8.length >= 6 && u8[0] === 0x47 && u8[1] === 0x49 && u8[2] === 0x46) {
+    return "image/gif";
+  }
+  if (
+    u8.length >= 12 &&
+    u8[0] === 0x52 &&
+    u8[1] === 0x49 &&
+    u8[2] === 0x46 &&
+    u8[3] === 0x46 &&
+    u8[8] === 0x57 &&
+    u8[9] === 0x45 &&
+    u8[10] === 0x42 &&
+    u8[11] === 0x50
+  ) {
+    return "image/webp";
+  }
+  return null;
+}
+
+/**
+ * Prefer sniffed image type so JPEG bytes labeled as image/png still render under nosniff.
+ */
+export function resolveMediaContentType(
+  declared: string | null | undefined,
+  bytes: ArrayBuffer,
+): string {
+  const sniffed = sniffImageContentType(bytes);
+  if (sniffed) return sniffed;
+  const trimmed = declared?.trim();
+  if (trimmed && trimmed !== "application/octet-stream") return trimmed;
+  return "application/octet-stream";
+}
+
+export async function readObjectBytes(object: R2ObjectBody): Promise<ArrayBuffer | null> {
+  if (!object.body) return null;
+  return new Response(object.body).arrayBuffer();
+}

@@ -37,6 +37,7 @@ Store Admins
 
 Catalog
   ├── Products
+  ├── Global Catalog
   ├── Categories
   └── Collections
 
@@ -102,6 +103,8 @@ Platform Admin can inspect:
 - products
 - orders
 - metrics
+
+Platform Super Admin can also create, update, and delete **store-owned** products through explicit platform store-scoped routes (`/api/v1/platform/stores/:storeId/products`). The JWT `storeId` stays null. Imported Global Catalog products remain platform-managed and are edited in Global Catalog, not as store catalog rows.
 
 ## 6. Store Admin Provisioning
 

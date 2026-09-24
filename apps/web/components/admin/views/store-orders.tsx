@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
@@ -24,7 +24,7 @@ import {
   type OrderStatus,
 } from "@/lib/api/admin/orders"
 import { ADMIN_TABLE_PAGE_SIZE } from "@/lib/admin-table"
-import { formatDate } from "@/lib/format"
+import { formatDateTime } from "@/lib/format"
 import { formatPaise } from "@/lib/money"
 
 const STATUS_OPTIONS: Array<{ value: OrderStatus | "ALL"; label: string }> = [
@@ -38,16 +38,33 @@ const STATUS_OPTIONS: Array<{ value: OrderStatus | "ALL"; label: string }> = [
   { value: "REFUNDED", label: "Returned (restocked)" },
 ]
 
+function parseStatus(value: string | null): OrderStatus | "ALL" {
+  return STATUS_OPTIONS.some((option) => option.value === value)
+    ? (value as OrderStatus | "ALL")
+    : "ALL"
+}
+
 export function StoreOrders() {
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const queryClient = useQueryClient()
-  const [status, setStatus] = useState<OrderStatus | "ALL">("ALL")
+  const status = parseStatus(searchParams.get("status"))
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState("")
   const [pendingStatus, setPendingStatus] = useState<{
     order: AdminOrder
     nextStatus: OrderStatus
   } | null>(null)
+
+  function setStatus(next: OrderStatus | "ALL") {
+    const params = new URLSearchParams(searchParams.toString())
+    if (next === "ALL") params.delete("status")
+    else params.set("status", next)
+    const query = params.toString()
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
+    setPage(1)
+  }
 
   const ordersQuery = useQuery({
     queryKey: ["admin", "orders", status, page, search],
@@ -110,14 +127,14 @@ export function StoreOrders() {
         accessorKey: "createdAt",
         header: "Created",
         sortFn: "datetime",
-        cell: ({ row }) => formatDate(row.original.createdAt),
+        cell: ({ row }) => formatDateTime(row.original.createdAt),
       },
       {
         accessorKey: "updatedAt",
         header: "Updated",
         sortFn: "datetime",
         cell: ({ row }) =>
-          row.original.updatedAt ? formatDate(row.original.updatedAt) : "—",
+          row.original.updatedAt ? formatDateTime(row.original.updatedAt) : "—",
       },
       {
         id: "actions",
@@ -171,7 +188,6 @@ export function StoreOrders() {
         onClear={() => {
           setStatus("ALL")
           setSearch("")
-          setPage(1)
         }}
         end={
           <AdminFilterSearch
@@ -190,7 +206,6 @@ export function StoreOrders() {
           value={status}
           onChange={(value) => {
             setStatus(value as OrderStatus | "ALL")
-            setPage(1)
           }}
           options={STATUS_OPTIONS}
         />

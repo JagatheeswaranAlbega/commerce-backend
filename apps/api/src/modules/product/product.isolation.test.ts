@@ -2,6 +2,7 @@ import { config } from "dotenv";
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { closeDb, createDb, type DatabaseHandle } from "@/db/client";
+import { DEVELOPMENT_STORES } from "@/db/seed";
 import { products } from "@/db/schema/products";
 import { stores } from "@/db/schema/stores";
 import { ProductRepository } from "@/modules/product/product.repository";
@@ -27,10 +28,11 @@ describe.runIf(hasDb)("store isolation (db)", () => {
 
   beforeAll(async () => {
     handle = createDb(process.env.DATABASE_URL!);
-    const storeA = await handle.db.query.stores.findFirst({ where: eq(stores.slug, "store-a") });
-    const storeB = await handle.db.query.stores.findFirst({ where: eq(stores.slug, "store-b") });
+    const [alora, zentrix] = DEVELOPMENT_STORES;
+    const storeA = await handle.db.query.stores.findFirst({ where: eq(stores.slug, alora!.slug) });
+    const storeB = await handle.db.query.stores.findFirst({ where: eq(stores.slug, zentrix!.slug) });
     if (!storeA || !storeB) {
-      throw new Error("Seed Store A/B before running isolation tests.");
+      throw new Error("Seed Alora Fashion / Zentrix before running isolation tests.");
     }
     storeAId = storeA.id;
     storeBId = storeB.id;

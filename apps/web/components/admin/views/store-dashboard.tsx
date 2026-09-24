@@ -109,7 +109,7 @@ export function StoreDashboard() {
                   {data?.openReturnsCount}
                 </p>
                 <Link
-                  href="/admin/returns"
+                  href="/admin/orders?status=REFUNDED"
                   className="text-sm font-medium underline-offset-4 hover:underline"
                 >
                   Review returns

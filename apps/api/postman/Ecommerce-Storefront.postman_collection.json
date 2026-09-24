@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Ecommerce Storefront API",
-    "description": "Headless storefront APIs under /api/v1/store. Requires x-publishable-key.\n\nPut only the raw key in the publishable_key variable: pk_live_ followed by hex, one line, no quotes, no JSON.\nCopy data.rawKey from Platform Admin → Create Key, or data.keys.publishableKey from Create Store. List Keys does not return the full key.\n\nIf Postman says Invalid character in header content [x-publishable-key], the variable still has a newline or pasted JSON — the collection pre-request script strips that.",
+    "description": "Headless storefront APIs under `/api/v1/store`. Requires `x-publishable-key`.\n\n## Setup\n1. Import this collection + `Store-A` (Alora) or `Store-B` (Zentrix) environment.\n2. After `npm run db:seed`, create a **new publishable key** in Platform Admin (or Create Store) and paste `data.rawKey` / `data.keys.publishableKey` into `publishable_key`.\n3. **List Keys only returns a prefix** (e.g. `pk_live_00161409…`) — that is not enough for this header.\n4. Put only the raw key: `pk_live_` + hex, one line, no quotes/JSON/newline.\n\nThe collection pre-request script sanitizes `publishable_key` if you accidentally paste junk.\n\n## Suggested smoke order\n1. Store → Details / List Products / Get Product By Handle (auto-sets `variant_id`, `media_id`, `product_handle`)\n2. Cart → Create Cart → Add Item → Set Cart Email → Set Shipping Address → Checkout\n3. Customer Auth → Register or Login → Me / My Orders\n4. Addresses CRUD (needs customer token)\n5. Wishlist → Add / List / Remove (needs customer token + `variant_id`)\n6. Request Return only works when the order status is **DELIVERED** (admin marks delivered first)\n\nSeed examples (Zentrix): product `ivory-soft-cotton-romper`, category `baby-boys`, collection `featured`.\nDiscount `SAVE10` is not seeded — create it in Store Admin first (`PERCENTAGE` / 10).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "event": [
@@ -32,16 +32,21 @@
   "variable": [
     { "key": "base_url", "value": "http://localhost:8787/api/v1" },
     { "key": "publishable_key", "value": "pk_live_REPLACE_ME" },
+    { "key": "product_handle", "value": "ivory-soft-cotton-romper" },
+    { "key": "category_slug", "value": "baby-boys" },
+    { "key": "collection_slug", "value": "featured" },
+    { "key": "search_q", "value": "romper" },
     { "key": "cart_id", "value": "" },
     { "key": "item_id", "value": "" },
     { "key": "variant_id", "value": "" },
+    { "key": "media_id", "value": "" },
     { "key": "customer_token", "value": "" },
     { "key": "address_id", "value": "" },
+    { "key": "wishlist_item_id", "value": "" },
     { "key": "order_id", "value": "" },
     { "key": "order_number", "value": "" },
-    { "key": "collection_slug", "value": "featured" },
-    { "key": "media_id", "value": "" },
-    { "key": "discount_code", "value": "SAVE10" }
+    { "key": "discount_code", "value": "SAVE10" },
+    { "key": "customer_email", "value": "customer@example.com" }
   ],
   "item": [
     {
@@ -52,29 +57,105 @@
           "request": {
             "method": "GET",
             "header": [{ "key": "x-publishable-key", "value": "{{publishable_key}}" }],
-            "url": "{{base_url}}/store/details"
+            "url": "{{base_url}}/store/details",
+            "description": "Public store profile + shipping/tax settings resolved from the publishable key."
           }
         },
         {
           "name": "List Products",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const items = json?.data || [];",
+                  "if (items[0]?.handle) pm.collectionVariables.set('product_handle', items[0].handle);",
+                  "if (items[0]?.thumbnail?.id) pm.collectionVariables.set('media_id', items[0].thumbnail.id);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [{ "key": "x-publishable-key", "value": "{{publishable_key}}" }],
-            "url": "{{base_url}}/store/products?page=1&pageSize=20",
-            "description": "Each product includes thumbnail { id, altText, src }. Prefer an admin-selected thumbnail when set; otherwise the first gallery image. Load the image at GET {{base_url}}{{thumbnail.src}} (same as /store/media/:id)."
+            "url": {
+              "raw": "{{base_url}}/store/products?page=1&pageSize=20&sort=created_at_desc",
+              "host": ["{{base_url}}"],
+              "path": ["store", "products"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "20" },
+                { "key": "sort", "value": "created_at_desc", "description": "created_at_desc | price_asc | price_desc" },
+                { "key": "q", "value": "{{search_q}}", "disabled": true },
+                { "key": "categoryId", "value": "", "disabled": true },
+                { "key": "collectionId", "value": "", "disabled": true },
+                { "key": "inStock", "value": "true", "disabled": true },
+                { "key": "minPricePaise", "value": "0", "disabled": true },
+                { "key": "maxPricePaise", "value": "", "disabled": true }
+              ]
+            },
+            "description": "Each product includes `thumbnail { id, altText, src }`, `minPricePaise`, `maxPricePaise`, `inStock`. Load image at `GET {{base_url}}{{thumbnail.src}}` (same as Get Media)."
+          }
+        },
+        {
+          "name": "Search Products",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "x-publishable-key", "value": "{{publishable_key}}" }],
+            "url": {
+              "raw": "{{base_url}}/store/products?page=1&pageSize=20&q={{search_q}}",
+              "host": ["{{base_url}}"],
+              "path": ["store", "products"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "20" },
+                { "key": "q", "value": "{{search_q}}" }
+              ]
+            },
+            "description": "Same list endpoint with `q` search."
           }
         },
         {
           "name": "Get Product By Handle",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const data = json?.data;",
+                  "if (data?.handle) pm.collectionVariables.set('product_handle', data.handle);",
+                  "const variant = (data?.variants || []).find((v) => v.inStock) || (data?.variants || [])[0];",
+                  "if (variant?.id) pm.collectionVariables.set('variant_id', variant.id);",
+                  "const media = data?.thumbnail?.id || data?.images?.[0]?.id;",
+                  "if (media) pm.collectionVariables.set('media_id', media);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [{ "key": "x-publishable-key", "value": "{{publishable_key}}" }],
-            "url": "{{base_url}}/store/products/classic-tee",
-            "description": "Returns variants, images[], and thumbnail. images[0] is the main image (explicit thumbnail if set, else first by gallery order); remaining images keep upload order. Use image.src or /store/media/:id to fetch the file."
+            "url": "{{base_url}}/store/products/{{product_handle}}",
+            "description": "Returns variants (with `availableQuantity` / `inStock`), `images[]`, and `thumbnail`. Zentrix seed default handle: `ivory-soft-cotton-romper`. Auto-saves `variant_id` and `media_id`."
           }
         },
         {
           "name": "List Categories",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const items = json?.data || [];",
+                  "const preferred = items.find((c) => c.slug === 'baby-boys') || items[0];",
+                  "if (preferred?.slug) pm.collectionVariables.set('category_slug', preferred.slug);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [{ "key": "x-publishable-key", "value": "{{publishable_key}}" }],
@@ -86,11 +167,24 @@
           "request": {
             "method": "GET",
             "header": [{ "key": "x-publishable-key", "value": "{{publishable_key}}" }],
-            "url": "{{base_url}}/store/categories/apparel"
+            "url": "{{base_url}}/store/categories/{{category_slug}}",
+            "description": "Category + nested products with thumbnails. Zentrix examples: `baby-boys`, `baby-girls`, `newborn-clothing`, `party-occasion-wear`, `baby-costumes`."
           }
         },
         {
           "name": "List Collections",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const items = json?.data || [];",
+                  "if (items[0]?.slug) pm.collectionVariables.set('collection_slug', items[0].slug);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [{ "key": "x-publishable-key", "value": "{{publishable_key}}" }],
@@ -102,7 +196,8 @@
           "request": {
             "method": "GET",
             "header": [{ "key": "x-publishable-key", "value": "{{publishable_key}}" }],
-            "url": "{{base_url}}/store/collections/{{collection_slug}}"
+            "url": "{{base_url}}/store/collections/{{collection_slug}}",
+            "description": "Seed collection slug is usually `featured`."
           }
         },
         {
@@ -110,7 +205,8 @@
           "request": {
             "method": "GET",
             "header": [{ "key": "x-publishable-key", "value": "{{publishable_key}}" }],
-            "url": "{{base_url}}/store/media/{{media_id}}"
+            "url": "{{base_url}}/store/media/{{media_id}}",
+            "description": "Returns **raw image bytes** (not JSON). Set `media_id` from List/Get Product thumbnail or images."
           }
         }
       ]
@@ -137,7 +233,8 @@
               { "key": "x-publishable-key", "value": "{{publishable_key}}" },
               { "key": "Authorization", "value": "Bearer {{customer_token}}", "disabled": true }
             ],
-            "url": "{{base_url}}/store/carts"
+            "url": "{{base_url}}/store/carts",
+            "description": "Optional customer JWT attaches the cart to the logged-in customer on create."
           }
         },
         {
@@ -145,7 +242,8 @@
           "request": {
             "method": "GET",
             "header": [{ "key": "x-publishable-key", "value": "{{publishable_key}}" }],
-            "url": "{{base_url}}/store/carts/{{cart_id}}"
+            "url": "{{base_url}}/store/carts/{{cart_id}}",
+            "description": "Includes estimated `taxTotalPaise`, `shippingTotalPaise`, `grandTotalPaise`."
           }
         },
         {
@@ -161,6 +259,19 @@
         },
         {
           "name": "Add Item",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const items = json?.data?.items || [];",
+                  "const match = items.find((i) => i.variantId === pm.collectionVariables.get('variant_id')) || items[0];",
+                  "if (match?.id) pm.collectionVariables.set('item_id', match.id);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -171,7 +282,8 @@
               "mode": "raw",
               "raw": "{\n  \"variantId\": \"{{variant_id}}\",\n  \"quantity\": 1\n}"
             },
-            "url": "{{base_url}}/store/carts/{{cart_id}}/items"
+            "url": "{{base_url}}/store/carts/{{cart_id}}/items",
+            "description": "Run Get Product By Handle first so `variant_id` is set. Stock is checked server-side."
           }
         },
         {
@@ -209,7 +321,8 @@
               "mode": "raw",
               "raw": "{\n  \"code\": \"{{discount_code}}\"\n}"
             },
-            "url": "{{base_url}}/store/carts/{{cart_id}}/discount"
+            "url": "{{base_url}}/store/carts/{{cart_id}}/discount",
+            "description": "Code must exist and be ACTIVE for this store. Create via Store Admin (`PERCENTAGE` or `FIXED_PAISE`). Not seeded by default."
           }
         },
         {
@@ -268,13 +381,26 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"customer@example.com\"\n}"
+              "raw": "{\n  \"email\": \"{{customer_email}}\"\n}"
             },
-            "url": "{{base_url}}/store/carts/{{cart_id}}/email"
+            "url": "{{base_url}}/store/carts/{{cart_id}}/email",
+            "description": "Required before checkout unless you pass `email` in the checkout body or the cart already has a customer email."
           }
         },
         {
           "name": "Checkout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json?.data?.id) pm.collectionVariables.set('order_id', json.data.id);",
+                  "if (json?.data?.orderNumber) pm.collectionVariables.set('order_number', json.data.orderNumber);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -285,9 +411,10 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"discountCode\": \"{{discount_code}}\"\n}"
+              "raw": "{\n  \"email\": \"{{customer_email}}\"\n}"
             },
-            "url": "{{base_url}}/store/carts/{{cart_id}}/checkout"
+            "url": "{{base_url}}/store/carts/{{cart_id}}/checkout",
+            "description": "Requires items + shipping address + email. Optional: enable customer JWT to attach the order to the customer. Optional body fields: `discountCode`, `email`. Money is integer paise."
           }
         }
       ]
@@ -297,28 +424,14 @@
       "item": [
         {
           "name": "Register",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "x-publishable-key", "value": "{{publishable_key}}" },
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"customer@example.com\",\n  \"password\": \"Customer@123\",\n  \"name\": \"Test Customer\"\n}"
-            },
-            "url": "{{base_url}}/store/auth/register"
-          }
-        },
-        {
-          "name": "Login",
           "event": [
             {
               "listen": "test",
               "script": {
                 "exec": [
                   "const json = pm.response.json();",
-                  "if (json?.data?.accessToken) pm.collectionVariables.set('customer_token', json.data.accessToken);"
+                  "if (json?.data?.accessToken) pm.collectionVariables.set('customer_token', json.data.accessToken);",
+                  "if (json?.data?.customer?.email) pm.collectionVariables.set('customer_email', json.data.customer.email);"
                 ]
               }
             }
@@ -331,7 +444,35 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"customer@example.com\",\n  \"password\": \"Customer@123\"\n}"
+              "raw": "{\n  \"email\": \"{{customer_email}}\",\n  \"password\": \"Customer@123\",\n  \"name\": \"Test Customer\"\n}"
+            },
+            "url": "{{base_url}}/store/auth/register",
+            "description": "Use a unique email per run if the address already exists."
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json?.data?.accessToken) pm.collectionVariables.set('customer_token', json.data.accessToken);",
+                  "if (json?.data?.customer?.email) pm.collectionVariables.set('customer_email', json.data.customer.email);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "x-publishable-key", "value": "{{publishable_key}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{customer_email}}\",\n  \"password\": \"Customer@123\"\n}"
             },
             "url": "{{base_url}}/store/auth/login"
           }
@@ -346,7 +487,12 @@
             ],
             "url": "{{base_url}}/store/auth/me"
           }
-        },
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
         {
           "name": "My Orders",
           "request": {
@@ -360,20 +506,33 @@
         },
         {
           "name": "Lookup Order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json?.data?.id) pm.collectionVariables.set('order_id', json.data.id);",
+                  "if (json?.data?.orderNumber) pm.collectionVariables.set('order_number', json.data.orderNumber);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [
               { "key": "x-publishable-key", "value": "{{publishable_key}}" }
             ],
             "url": {
-              "raw": "{{base_url}}/store/orders/lookup?orderNumber={{order_number}}&email=customer@example.com",
+              "raw": "{{base_url}}/store/orders/lookup?orderNumber={{order_number}}&email={{customer_email}}",
               "host": ["{{base_url}}"],
               "path": ["store", "orders", "lookup"],
               "query": [
                 { "key": "orderNumber", "value": "{{order_number}}" },
-                { "key": "email", "value": "customer@example.com" }
+                { "key": "email", "value": "{{customer_email}}" }
               ]
-            }
+            },
+            "description": "Guest order lookup by order number + email. No customer JWT required."
           }
         },
         {
@@ -385,6 +544,23 @@
               { "key": "Authorization", "value": "Bearer {{customer_token}}" }
             ],
             "url": "{{base_url}}/store/orders/{{order_id}}"
+          }
+        },
+        {
+          "name": "Request Return",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "x-publishable-key", "value": "{{publishable_key}}" },
+              { "key": "Authorization", "value": "Bearer {{customer_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Item does not fit as expected\"\n}"
+            },
+            "url": "{{base_url}}/store/orders/{{order_id}}/return",
+            "description": "Only for **DELIVERED** orders owned by the customer. Creates a `REQUESTED` return. Restock happens after Store Admin approval. Returns 422 if status is still PENDING/SHIPPED."
           }
         }
       ]
@@ -455,6 +631,76 @@
               { "key": "Authorization", "value": "Bearer {{customer_token}}" }
             ],
             "url": "{{base_url}}/store/addresses/{{address_id}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Wishlist",
+      "item": [
+        {
+          "name": "List Wishlist",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "x-publishable-key", "value": "{{publishable_key}}" },
+              { "key": "Authorization", "value": "Bearer {{customer_token}}" }
+            ],
+            "url": "{{base_url}}/store/wishlist",
+            "description": "Returns wishlist items with nested variant + product summary. Newest first."
+          }
+        },
+        {
+          "name": "Add To Wishlist",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json?.data?.id) pm.collectionVariables.set('wishlist_item_id', json.data.id);",
+                  "if (json?.data?.variantId) pm.collectionVariables.set('variant_id', json.data.variantId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "x-publishable-key", "value": "{{publishable_key}}" },
+              { "key": "Authorization", "value": "Bearer {{customer_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"variantId\": \"{{variant_id}}\"\n}"
+            },
+            "url": "{{base_url}}/store/wishlist",
+            "description": "Adds an ACTIVE store variant. Duplicate adds are idempotent (returns existing row)."
+          }
+        },
+        {
+          "name": "Remove Wishlist Item",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "x-publishable-key", "value": "{{publishable_key}}" },
+              { "key": "Authorization", "value": "Bearer {{customer_token}}" }
+            ],
+            "url": "{{base_url}}/store/wishlist/{{wishlist_item_id}}",
+            "description": "Remove by wishlist item id."
+          }
+        },
+        {
+          "name": "Remove Wishlist By Variant",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "x-publishable-key", "value": "{{publishable_key}}" },
+              { "key": "Authorization", "value": "Bearer {{customer_token}}" }
+            ],
+            "url": "{{base_url}}/store/wishlist/variants/{{variant_id}}",
+            "description": "Remove by variant id (useful for heart toggles)."
           }
         }
       ]

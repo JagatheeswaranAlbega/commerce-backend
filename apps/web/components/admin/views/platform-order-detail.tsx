@@ -8,7 +8,7 @@ import { useQuery } from "@tanstack/react-query"
 import { DataTable, type AppColumnDef } from "@/components/data-table"
 import { Badge } from "@/components/ui/badge"
 import { getPlatformOrder } from "@/lib/api/platform/orders"
-import { formatDate } from "@/lib/format"
+import { formatDateTime } from "@/lib/format"
 import { formatPaise } from "@/lib/money"
 
 type LineItem = NonNullable<
@@ -95,7 +95,7 @@ export function PlatformOrderDetail() {
               : order.status}
           </Badge>
           <span className="text-sm text-muted-foreground">
-            {formatDate(order.createdAt)}
+            {formatDateTime(order.createdAt)}
           </span>
           <Link
             href={`/admin/stores/${order.storeId}`}

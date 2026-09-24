@@ -1,14 +1,8 @@
 import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
-import postgres, { type Sql, type Options } from "postgres";
+import postgres, { type Sql } from "postgres";
 import { schema } from "@/db/schema";
 import { getEnv } from "@/infrastructure/env/env";
-import {
-  databaseHostLabel,
-  isNeonPoolerHost,
-  normalizeDatabaseUrl,
-  resolveDatabaseUrl,
-} from "@/infrastructure/database/connection";
-import { postgresErrorFields } from "@/shared/logging/postgres-error";
+import { resolveDatabaseUrl } from "@/infrastructure/database/connection";
 
 export type Database = PostgresJsDatabase<typeof schema>;
 
@@ -16,38 +10,19 @@ export type DatabaseHandle = {
   db: Database;
   client: Sql;
   connectionString: string;
-  close: () => Promise<void>;
 };
 
-/**
- * Cloudflare Workers + Hyperdrive / Neon options (postgres.js).
- * Requires `nodejs_compat` for TCP sockets in Workers.
- * See: https://developers.cloudflare.com/hyperdrive/examples/connect-to-postgres/
- */
-function workerPostgresOptions(connectionString: string): Options<{}> {
-  const usePooler = isNeonPoolerHost(connectionString);
-  return {
-    max: 1,
-    fetch_types: false,
-    // Named prepared statements are incompatible with Neon pooler / PgBouncer.
-    prepare: !usePooler,
-    connect_timeout: 15,
-  };
-}
+const workerPostgresOptions = {
+  // Hyperdrive pools upstream connections; keep the Worker-side pool small.
+  max: 1,
+  fetch_types: false,
+} as const;
 
-export function createDb(rawConnectionString: string): DatabaseHandle {
-  const connectionString = normalizeDatabaseUrl(rawConnectionString);
-  const client = postgres(connectionString, workerPostgresOptions(connectionString));
+export function createDb(connectionString: string): DatabaseHandle {
+  const client = postgres(connectionString, workerPostgresOptions);
   const db = drizzle(client, { schema });
 
-  return {
-    db,
-    client,
-    connectionString,
-    close: async () => {
-      await client.end({ timeout: 5 });
-    },
-  };
+  return { db, client, connectionString };
 }
 
 /**
@@ -56,18 +31,10 @@ export function createDb(rawConnectionString: string): DatabaseHandle {
  */
 export async function openDb(fallbackUrl?: string): Promise<DatabaseHandle> {
   const connectionString = await resolveDatabaseUrl(fallbackUrl ?? getEnv().DATABASE_URL);
-  try {
-    return createDb(connectionString);
-  } catch (error) {
-    console.error("Failed to open database connection:", {
-      host: databaseHostLabel(connectionString),
-      ...postgresErrorFields(error),
-    });
-    throw error;
-  }
+  return createDb(connectionString);
 }
 
-/** @deprecated Prefer openDb() + explicit close for Workers. */
+/** @deprecated Prefer openDb() + explicit client.end() / waitUntil for Workers. */
 export async function getDb(): Promise<Database> {
   const handle = await openDb();
   return handle.db;
@@ -78,5 +45,5 @@ export async function closeDb(handle?: DatabaseHandle): Promise<void> {
     return;
   }
 
-  await handle.close();
+  await handle.client.end({ timeout: 5 });
 }

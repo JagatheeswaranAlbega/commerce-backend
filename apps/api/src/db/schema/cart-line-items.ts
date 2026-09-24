@@ -1,7 +1,7 @@
 import { index, integer, pgTable, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { carts } from "./carts";
 import { timestamps } from "./columns";
-import { productVariants } from "./product-variants";
+import { catalogItemSourceEnum } from "./enums";
 import { stores } from "./stores";
 
 export const cartLineItems = pgTable(
@@ -14,9 +14,9 @@ export const cartLineItems = pgTable(
     cartId: uuid("cart_id")
       .notNull()
       .references(() => carts.id, { onDelete: "cascade" }),
-    variantId: uuid("variant_id")
-      .notNull()
-      .references(() => productVariants.id, { onDelete: "restrict" }),
+    /** STORE or GLOBAL variant id; validated by sellable-variant resolver. */
+    variantId: uuid("variant_id").notNull(),
+    source: catalogItemSourceEnum("source").notNull().default("STORE"),
     quantity: integer("quantity").notNull(),
     unitPricePaise: integer("unit_price_paise").notNull(),
     ...timestamps,

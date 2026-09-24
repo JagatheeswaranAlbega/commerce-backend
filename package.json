@@ -22,7 +22,6 @@
     "format:check": "prettier --check ."
   },
   "devDependencies": {
-    "lightningcss-win32-x64-msvc": "^1.32.0",
     "prettier": "^3.6.2",
     "turbo": "^2.5.8"
   }

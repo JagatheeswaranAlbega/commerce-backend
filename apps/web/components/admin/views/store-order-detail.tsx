@@ -1,6 +1,5 @@
 "use client"
 
-import Link from "next/link"
 import { useParams } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
@@ -29,8 +28,9 @@ import {
   type OrderStatus,
 } from "@/lib/api/admin/orders"
 import { getAdminSettings } from "@/lib/api/admin/settings"
-import { formatDate } from "@/lib/format"
+import { formatDateTime } from "@/lib/format"
 import { formatPaise } from "@/lib/money"
+import { appToast } from "@/lib/toast"
 
 const fulfillSchema = z.object({
   trackingNumber: z.string().trim().min(1).optional().or(z.literal("")),
@@ -48,10 +48,12 @@ function escapeHtml(value: string) {
     .replaceAll('"', "&quot;")
 }
 
-function openPrintableDocument(title: string, bodyHtml: string) {
-  const win = window.open("", "_blank", "noopener,noreferrer,width=800,height=900")
-  if (!win) return
-  win.document.write(`<!doctype html>
+function openPrintableDocument(
+  title: string,
+  bodyHtml: string,
+  windowName: string
+) {
+  const html = `<!doctype html>
 <html>
 <head>
   <meta charset="utf-8" />
@@ -65,26 +67,43 @@ function openPrintableDocument(title: string, bodyHtml: string) {
     th, td { border-bottom: 1px solid #ddd; padding: 8px 6px; text-align: left; }
     th { font-weight: 600; }
     .muted { color: #555; }
+    .toolbar { display: flex; justify-content: flex-end; margin-bottom: 16px; }
+    .toolbar button {
+      font: inherit; font-size: 13px; padding: 8px 14px; border: 1px solid #111;
+      background: #111; color: #fff; border-radius: 6px; cursor: pointer;
+    }
     .totals { margin-top: 16px; max-width: 280px; margin-left: auto; }
     .totals div { display: flex; justify-content: space-between; gap: 24px; padding: 4px 0; }
     .totals .grand { font-weight: 600; border-top: 1px solid #ddd; margin-top: 6px; padding-top: 8px; }
-    @media print { body { margin: 12px; } }
+    @media print { body { margin: 12px; } .toolbar { display: none; } }
   </style>
 </head>
 <body>
+  <div class="toolbar"><button type="button" onclick="window.print()">Print</button></div>
 ${bodyHtml}
-<script>window.onload = function () { window.focus(); window.print(); };</script>
 </body>
-</html>`)
-  win.document.close()
+</html>`
+
+  const url = URL.createObjectURL(new Blob([html], { type: "text/html" }))
+  const win = window.open(url, windowName)
+  if (!win) {
+    URL.revokeObjectURL(url)
+    appToast.error("Pop-up blocked. Allow pop-ups to open this document.")
+    return
+  }
+  win.opener = null
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
 }
 
-function buildOrderPrintHtml(
-  order: AdminOrder,
-  kind: "packing" | "invoice",
-  settings: { gstin: string | null; gstPercent: number; storeName?: string }
-) {
-  const address = [
+type PrintSettings = {
+  gstin: string | null
+  gstPercent: number
+  storeName?: string
+  contactEmail?: string | null
+}
+
+function formatShipToHtml(order: AdminOrder) {
+  const lines = [
     order.shippingName,
     order.shippingPhone,
     [order.shippingAddressLine1, order.shippingAddressLine2]
@@ -99,6 +118,73 @@ function buildOrderPrintHtml(
     .map((line) => `<div>${escapeHtml(String(line))}</div>`)
     .join("")
 
+  return lines || "<p class='muted'>No shipping address</p>"
+}
+
+function buildPackingSlipHtml(order: AdminOrder, settings: PrintSettings) {
+  const storeLine = settings.storeName
+    ? `<p class="muted">${escapeHtml(settings.storeName)}</p>`
+    : ""
+  const fulfillment = [
+    order.carrier
+      ? `<div>Carrier: ${escapeHtml(order.carrier)}</div>`
+      : "",
+    order.trackingNumber
+      ? `<div>Tracking: ${escapeHtml(order.trackingNumber)}</div>`
+      : "",
+  ]
+    .filter(Boolean)
+    .join("")
+  const rows = (order.items ?? [])
+    .map(
+      (item) => `<tr>
+      <td>${escapeHtml(item.productTitle)}</td>
+      <td>${escapeHtml(item.variantTitle)}</td>
+      <td>${escapeHtml(item.sku)}</td>
+      <td>${item.quantity}</td>
+    </tr>`
+    )
+    .join("")
+  const totalUnits = (order.items ?? []).reduce(
+    (sum, item) => sum + item.quantity,
+    0
+  )
+
+  return `
+    <h1>Packing slip</h1>
+    ${storeLine}
+    <p><strong>${escapeHtml(order.orderNumber)}</strong> · ${escapeHtml(order.status)} · ${escapeHtml(formatDateTime(order.createdAt))}</p>
+    <h2>Ship to</h2>
+    ${formatShipToHtml(order)}
+    ${fulfillment ? `<h2>Fulfillment</h2>${fulfillment}` : ""}
+    <h2>Items to pack</h2>
+    <table>
+      <thead>
+        <tr><th>Product</th><th>Variant</th><th>SKU</th><th>Qty</th></tr>
+      </thead>
+      <tbody>
+        ${rows || `<tr><td colspan="4">No line items</td></tr>`}
+      </tbody>
+    </table>
+    <p>Total units: <strong>${totalUnits}</strong></p>
+  `
+}
+
+function buildInvoiceHtml(order: AdminOrder, settings: PrintSettings) {
+  const storeLine = settings.storeName
+    ? `<p class="muted">${escapeHtml(settings.storeName)}</p>`
+    : ""
+  const gstinLine = settings.gstin
+    ? `<p>GSTIN: ${escapeHtml(settings.gstin)}</p>`
+    : ""
+  const storeEmailLine = settings.contactEmail
+    ? `<p class="muted">${escapeHtml(settings.contactEmail)}</p>`
+    : ""
+  const emailLine = order.email
+    ? `<p>Email: ${escapeHtml(order.email)}</p>`
+    : ""
+  const gstLabel =
+    settings.gstPercent > 0 ? `GST (${settings.gstPercent}%)` : "GST"
   const rows = (order.items ?? [])
     .map(
       (item) => `<tr>
@@ -110,28 +196,15 @@ function buildOrderPrintHtml(
     )
     .join("")
 
-  const gstLabel =
-    settings.gstPercent > 0 ? `GST (${settings.gstPercent}%)` : "GST"
-
-  const heading = kind === "packing" ? "Packing slip" : "Invoice"
-  const storeLine = settings.storeName
-    ? `<p class="muted">${escapeHtml(settings.storeName)}</p>`
-    : ""
-  const emailLine = order.email
-    ? `<p>Email: ${escapeHtml(order.email)}</p>`
-    : ""
-  const gstinLine = settings.gstin
-    ? `<p>GSTIN: ${escapeHtml(settings.gstin)}</p>`
-    : ""
-
   return `
-    <h1>${escapeHtml(heading)}</h1>
+    <h1>Invoice</h1>
     ${storeLine}
-    <p><strong>${escapeHtml(order.orderNumber)}</strong> · ${escapeHtml(order.status)} · ${escapeHtml(formatDate(order.createdAt))}</p>
-    ${emailLine}
+    ${storeEmailLine}
     ${gstinLine}
-    <h2>Ship to</h2>
-    ${address || "<p class='muted'>No shipping address</p>"}
+    <p><strong>${escapeHtml(order.orderNumber)}</strong> · ${escapeHtml(formatDateTime(order.createdAt))}</p>
+    ${emailLine}
+    <h2>Bill to</h2>
+    ${formatShipToHtml(order)}
     <h2>Line items</h2>
     <table>
       <thead>
@@ -149,6 +222,16 @@ function buildOrderPrintHtml(
       <div class="grand"><span>Grand total</span><span>${escapeHtml(formatPaise(order.grandTotalPaise))}</span></div>
     </div>
   `
+}
+
+function buildOrderPrintHtml(
+  order: AdminOrder,
+  kind: "packing" | "invoice",
+  settings: PrintSettings
+) {
+  return kind === "packing"
+    ? buildPackingSlipHtml(order, settings)
+    : buildInvoiceHtml(order, settings)
 }
 
 export function StoreOrderDetail() {
@@ -286,7 +369,9 @@ export function StoreOrderDetail() {
         gstin: settings?.tax.gstin ?? null,
         gstPercent: settings?.tax.gstPercent ?? 0,
         storeName: settings?.name,
-      })
+        contactEmail: settings?.contactEmail,
+      }),
+      `${kind}-${order.id}`
     )
   }
 
@@ -319,7 +404,7 @@ export function StoreOrderDetail() {
     <div className="flex flex-col gap-8">
       <AdminPageHeader
         title={order.orderNumber}
-        description={`${order.status === "REFUNDED" ? "returned (restocked)" : order.status} · ${formatDate(order.createdAt)}`}
+        description={`${order.status === "REFUNDED" ? "returned (restocked)" : order.status} · ${formatDateTime(order.createdAt)}`}
         breadcrumbs={[
           { label: "Orders", href: "/admin/orders" },
           { label: order.orderNumber },
@@ -412,14 +497,8 @@ export function StoreOrderDetail() {
               >
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="secondary">{ret.status}</Badge>
-                  <Link
-                    href="/admin/returns"
-                    className="underline-offset-4 hover:underline"
-                  >
-                    View in Returns
-                  </Link>
                   <span className="text-muted-foreground">
-                    {formatDate(ret.createdAt)}
+                    {formatDateTime(ret.createdAt)}
                   </span>
                 </div>
                 <p className="mt-1 text-muted-foreground">{ret.reason}</p>
@@ -534,6 +613,7 @@ export function StoreOrderDetail() {
                   value={carrier}
                   onChange={(e) => setCarrier(e.target.value)}
                   disabled={fulfillMutation.isPending}
+                  placeholder="e.g. Delhivery, Blue Dart"
                 />
               </Field>
               <Field>

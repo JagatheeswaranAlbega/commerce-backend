@@ -3,13 +3,28 @@
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Check, Copy, KeyRound } from "lucide-react"
+import {
+  Check,
+  ChevronRight,
+  Copy,
+  Globe2,
+  KeyRound,
+  MapPin,
+  Percent,
+  Store,
+  Truck,
+  UserRound,
+} from "lucide-react"
 import { z } from "zod"
 
 import { AdminPageHeader } from "@/components/admin/page-header"
 import { useUnsavedChangesGuard } from "@/components/admin/navigation-guard"
 import { useAdminPermissions } from "@/components/admin/permission-gate"
 import { SettingsProfileCard } from "@/components/admin/settings-profile-card"
+import {
+  SettingsSectionLayout,
+  type SettingsSection,
+} from "@/components/admin/settings-section-layout"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -35,6 +50,59 @@ import {
   type AdminStoreSettings,
   type ShippingMode,
 } from "@/lib/api/admin/settings"
+
+const STORE_SETTINGS_SECTIONS: SettingsSection[] = [
+  {
+    id: "profile",
+    label: "Profile",
+    description: "Account & password",
+    icon: UserRound,
+  },
+  {
+    id: "general",
+    label: "General",
+    description: "Name & status",
+    icon: Store,
+  },
+  {
+    id: "storefront",
+    label: "Storefront",
+    description: "Domain & contact",
+    icon: Globe2,
+  },
+  {
+    id: "regional",
+    label: "Regional",
+    description: "Currency & timezone",
+    icon: MapPin,
+  },
+  {
+    id: "shipping",
+    label: "Shipping",
+    description: "Checkout rates",
+    icon: Truck,
+  },
+  {
+    id: "tax",
+    label: "Tax",
+    description: "GST & GSTIN",
+    icon: Percent,
+  },
+  {
+    id: "related",
+    label: "Related",
+    description: "API keys & more",
+    icon: KeyRound,
+  },
+]
+
+const FORM_SECTIONS = new Set([
+  "general",
+  "storefront",
+  "regional",
+  "shipping",
+  "tax",
+])
 
 const TIMEZONES = [
   { value: "Asia/Kolkata", label: "India Standard Time — Asia/Kolkata" },
@@ -137,6 +205,57 @@ function applySettings(
   )
   setters.setGstPercent(String(data.tax?.gstPercent ?? 3))
   setters.setGstin(data.tax?.gstin ?? "")
+}
+
+function SettingsSaveBar({
+  saved,
+  isDirty,
+  fieldsDisabled,
+  canManage,
+  error,
+  onDiscard,
+  savePending,
+}: {
+  saved: boolean
+  isDirty: boolean
+  fieldsDisabled: boolean
+  canManage: boolean
+  error: string | null
+  onDiscard: () => void
+  savePending: boolean
+}) {
+  return (
+    <div className="flex flex-col gap-3">
+      {error ? <FieldError>{error}</FieldError> : null}
+      {!canManage ? (
+        <p className="text-sm text-muted-foreground">
+          You can view settings but do not have permission to change them.
+        </p>
+      ) : null}
+      <div className="admin-panel sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-3 px-4 py-3.5">
+        <p className="text-sm text-muted-foreground">
+          {saved
+            ? "Settings saved."
+            : isDirty
+              ? "You have unsaved changes."
+              : "No pending changes."}
+        </p>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={!isDirty || fieldsDisabled}
+            onClick={onDiscard}
+          >
+            Discard
+          </Button>
+          <Button type="submit" disabled={!isDirty || fieldsDisabled}>
+            {savePending ? "Saving..." : "Save settings"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export function StoreSettings() {
@@ -349,8 +468,378 @@ export function StoreSettings() {
 
   const fieldsDisabled = !canManage || saveMutation.isPending
 
+  function renderStorePanel(section: string) {
+    if (settingsQuery.isLoading) {
+      return <Skeleton className="h-56 w-full" />
+    }
+
+    if (settingsQuery.isError) {
+      return (
+        <Card>
+          <CardHeader>
+            <CardTitle>Unable to load store settings</CardTitle>
+            <CardDescription>
+              {settingsQuery.error instanceof Error
+                ? settingsQuery.error.message
+                : "Failed to load settings."}
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )
+    }
+
+    if (section === "related") {
+      return (
+        <Card>
+          <CardHeader className="border-b">
+            <CardTitle>Related</CardTitle>
+            <CardDescription>
+              Integrations managed on their own pages
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-(--card-spacing)">
+            <Link
+              href="/admin/keys"
+              className="group flex items-center gap-3 rounded-xl border border-border/70 bg-muted/20 px-3.5 py-3.5 transition-colors hover:border-border hover:bg-muted/45"
+            >
+              <span className="admin-kpi-icon">
+                <KeyRound className="size-4" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium">API keys</p>
+                <p className="text-sm text-muted-foreground">
+                  Publishable and secret keys for storefront and server access
+                </p>
+              </div>
+              <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+            </Link>
+          </CardContent>
+        </Card>
+      )
+    }
+
+    if (!FORM_SECTIONS.has(section)) return null
+
+    return (
+      <form onSubmit={onSubmit} className="flex flex-col gap-4">
+        {section === "general" ? (
+          <Card>
+            <CardHeader className="border-b">
+              <CardTitle>General</CardTitle>
+              <CardDescription>
+                Public name and identifiers for this store
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-(--card-spacing)">
+              <FieldGroup className="gap-5">
+                <Field data-invalid={fieldErrors.name ? true : undefined}>
+                  <FieldLabel htmlFor="name">Store name</FieldLabel>
+                  <Input
+                    id="name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    disabled={fieldsDisabled}
+                    placeholder="Alora Fashion"
+                    aria-invalid={fieldErrors.name ? true : undefined}
+                  />
+                  <FieldDescription>
+                    Shown to customers on the storefront and in order emails
+                  </FieldDescription>
+                  {fieldErrors.name ? (
+                    <FieldError>{fieldErrors.name}</FieldError>
+                  ) : null}
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="slug">Slug</FieldLabel>
+                  <div className="flex gap-2">
+                    <Input
+                      id="slug"
+                      value={settings?.slug ?? ""}
+                      disabled
+                      readOnly
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => void copySlug()}
+                      aria-label="Copy slug"
+                    >
+                      {copied ? <Check /> : <Copy />}
+                    </Button>
+                  </div>
+                  <FieldDescription>
+                    URL identifier assigned at store creation. Ask a platform
+                    admin to change it.
+                  </FieldDescription>
+                </Field>
+                <Field>
+                  <FieldLabel>Store status</FieldLabel>
+                  <p className="text-sm">
+                    {settings?.status === "ACTIVE"
+                      ? "This store can sell. Status is managed by the platform."
+                      : "This store is inactive. Status is managed by the platform."}
+                  </p>
+                </Field>
+              </FieldGroup>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {section === "storefront" ? (
+          <Card>
+            <CardHeader className="border-b">
+              <CardTitle>Storefront</CardTitle>
+              <CardDescription>
+                Domain and contact details exposed to customers
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-(--card-spacing)">
+              <FieldGroup className="gap-5">
+                <Field data-invalid={fieldErrors.domain ? true : undefined}>
+                  <FieldLabel htmlFor="domain">Domain</FieldLabel>
+                  <Input
+                    id="domain"
+                    value={domain}
+                    onChange={(e) => setDomain(e.target.value)}
+                    disabled={fieldsDisabled}
+                    placeholder="shop.example.com"
+                    aria-invalid={fieldErrors.domain ? true : undefined}
+                  />
+                  <FieldDescription>
+                    Public hostname for this store. Leave blank to use the slug
+                    only. DNS verification is not required yet.
+                  </FieldDescription>
+                  {fieldErrors.domain ? (
+                    <FieldError>{fieldErrors.domain}</FieldError>
+                  ) : null}
+                </Field>
+                <Field
+                  data-invalid={fieldErrors.contactEmail ? true : undefined}
+                >
+                  <FieldLabel htmlFor="contact-email">Contact email</FieldLabel>
+                  <Input
+                    id="contact-email"
+                    type="email"
+                    value={contactEmail}
+                    onChange={(e) => setContactEmail(e.target.value)}
+                    disabled={fieldsDisabled}
+                    placeholder="hello@example.com"
+                    aria-invalid={fieldErrors.contactEmail ? true : undefined}
+                  />
+                  <FieldDescription>
+                    Customer-facing address for support and order questions
+                  </FieldDescription>
+                  {fieldErrors.contactEmail ? (
+                    <FieldError>{fieldErrors.contactEmail}</FieldError>
+                  ) : null}
+                </Field>
+              </FieldGroup>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {section === "regional" ? (
+          <Card>
+            <CardHeader className="border-b">
+              <CardTitle>Regional</CardTitle>
+              <CardDescription>
+                Currency is fixed to INR. Timezone controls dates shown in this
+                admin.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-(--card-spacing)">
+              <FieldGroup className="gap-5">
+                <Field>
+                  <FieldLabel htmlFor="currency">Currency</FieldLabel>
+                  <Input id="currency" value="INR" disabled readOnly />
+                  <FieldDescription>
+                    All prices and orders use INR, stored as integer paise
+                  </FieldDescription>
+                </Field>
+                <Field data-invalid={fieldErrors.timezone ? true : undefined}>
+                  <FieldLabel htmlFor="timezone">Timezone</FieldLabel>
+                  <select
+                    id="timezone"
+                    className={selectClassName}
+                    value={timezone}
+                    onChange={(e) => setTimezone(e.target.value)}
+                    disabled={fieldsDisabled}
+                  >
+                    {timezoneOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  {fieldErrors.timezone ? (
+                    <FieldError>{fieldErrors.timezone}</FieldError>
+                  ) : null}
+                </Field>
+              </FieldGroup>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {section === "shipping" ? (
+          <Card>
+            <CardHeader className="border-b">
+              <CardTitle>Shipping</CardTitle>
+              <CardDescription>
+                Checkout shipping rules for this store (amounts in rupees)
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-(--card-spacing)">
+              <FieldGroup className="gap-5">
+                <Field
+                  data-invalid={fieldErrors.shippingMode ? true : undefined}
+                >
+                  <FieldLabel htmlFor="shipping-mode">Mode</FieldLabel>
+                  <select
+                    id="shipping-mode"
+                    className={selectClassName}
+                    value={shippingMode}
+                    onChange={(e) =>
+                      setShippingMode(e.target.value as ShippingMode)
+                    }
+                    disabled={fieldsDisabled}
+                  >
+                    {SHIPPING_MODE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  {fieldErrors.shippingMode ? (
+                    <FieldError>{fieldErrors.shippingMode}</FieldError>
+                  ) : null}
+                </Field>
+                {shippingMode !== "off" ? (
+                  <Field
+                    data-invalid={fieldErrors.flatRupees ? true : undefined}
+                  >
+                    <FieldLabel htmlFor="flat-rupees">
+                      Flat shipping (₹)
+                    </FieldLabel>
+                    <Input
+                      id="flat-rupees"
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={flatRupees}
+                      onChange={(e) => setFlatRupees(e.target.value)}
+                      disabled={fieldsDisabled}
+                      placeholder="200"
+                      aria-invalid={fieldErrors.flatRupees ? true : undefined}
+                    />
+                    <FieldDescription>
+                      Charged when shipping applies. Stored as paise on save.
+                    </FieldDescription>
+                    {fieldErrors.flatRupees ? (
+                      <FieldError>{fieldErrors.flatRupees}</FieldError>
+                    ) : null}
+                  </Field>
+                ) : null}
+                {shippingMode === "free_over" ? (
+                  <Field
+                    data-invalid={
+                      fieldErrors.freeOverRupees ? true : undefined
+                    }
+                  >
+                    <FieldLabel htmlFor="free-over-rupees">
+                      Free over (₹)
+                    </FieldLabel>
+                    <Input
+                      id="free-over-rupees"
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={freeOverRupees}
+                      onChange={(e) => setFreeOverRupees(e.target.value)}
+                      disabled={fieldsDisabled}
+                      placeholder="500"
+                      aria-invalid={
+                        fieldErrors.freeOverRupees ? true : undefined
+                      }
+                    />
+                    <FieldDescription>
+                      Orders at or above this merchandise total ship free
+                    </FieldDescription>
+                    {fieldErrors.freeOverRupees ? (
+                      <FieldError>{fieldErrors.freeOverRupees}</FieldError>
+                    ) : null}
+                  </Field>
+                ) : null}
+              </FieldGroup>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {section === "tax" ? (
+          <Card>
+            <CardHeader className="border-b">
+              <CardTitle>Tax</CardTitle>
+              <CardDescription>
+                GST applied at checkout on discounted merchandise
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-(--card-spacing)">
+              <FieldGroup className="gap-5">
+                <Field data-invalid={fieldErrors.gstPercent ? true : undefined}>
+                  <FieldLabel htmlFor="gst-percent">GST percent</FieldLabel>
+                  <Input
+                    id="gst-percent"
+                    type="number"
+                    min={0}
+                    max={100}
+                    step="0.01"
+                    value={gstPercent}
+                    onChange={(e) => setGstPercent(e.target.value)}
+                    disabled={fieldsDisabled}
+                    placeholder="3"
+                    aria-invalid={fieldErrors.gstPercent ? true : undefined}
+                  />
+                  {fieldErrors.gstPercent ? (
+                    <FieldError>{fieldErrors.gstPercent}</FieldError>
+                  ) : null}
+                </Field>
+                <Field data-invalid={fieldErrors.gstin ? true : undefined}>
+                  <FieldLabel htmlFor="gstin">GSTIN</FieldLabel>
+                  <Input
+                    id="gstin"
+                    value={gstin}
+                    onChange={(e) => setGstin(e.target.value)}
+                    disabled={fieldsDisabled}
+                    placeholder="22AAAAA0000A1Z5"
+                    aria-invalid={fieldErrors.gstin ? true : undefined}
+                  />
+                  <FieldDescription>
+                    Shown on invoices and packing slips when set
+                  </FieldDescription>
+                  {fieldErrors.gstin ? (
+                    <FieldError>{fieldErrors.gstin}</FieldError>
+                  ) : null}
+                </Field>
+              </FieldGroup>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        <SettingsSaveBar
+          saved={saved}
+          isDirty={isDirty}
+          fieldsDisabled={fieldsDisabled}
+          canManage={canManage}
+          error={error}
+          onDiscard={discard}
+          savePending={saveMutation.isPending}
+        />
+      </form>
+    )
+  }
+
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+    <div className="flex flex-col gap-4">
       <AdminPageHeader
         title="Settings"
         description="Your account, store identity, and storefront configuration"
@@ -366,394 +855,27 @@ export function StoreSettings() {
         }
       />
 
-      <SettingsProfileCard
-        user={user}
-        isLoading={permissionsLoading}
-        scopeLabel={
-          settings
-            ? `${settings.name} (${settings.slug})`
-            : "This store"
+      <SettingsSectionLayout
+        sections={STORE_SETTINGS_SECTIONS}
+        defaultSection="profile"
+      >
+        {(section) =>
+          section === "profile" ? (
+            <SettingsProfileCard
+              user={user}
+              isLoading={permissionsLoading}
+              scopeLabel={
+                settings
+                  ? `${settings.name} (${settings.slug})`
+                  : "This store"
+              }
+              scopeDescription="You can only manage data for this store. Scope comes from your login, not a client store ID."
+            />
+          ) : (
+            renderStorePanel(section)
+          )
         }
-        scopeDescription="You can only manage data for this store. Scope comes from your login, not a client store ID."
-      />
-
-      {settingsQuery.isLoading ? (
-        <div className="flex flex-col gap-6">
-          <Skeleton className="h-36 w-full" />
-          <Skeleton className="h-56 w-full" />
-          <Skeleton className="h-40 w-full" />
-        </div>
-      ) : settingsQuery.isError ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Unable to load store settings</CardTitle>
-            <CardDescription>
-              {settingsQuery.error instanceof Error
-                ? settingsQuery.error.message
-                : "Failed to load settings."}
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      ) : (
-        <>
-          <form onSubmit={onSubmit} className="flex flex-col gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>General</CardTitle>
-                <CardDescription>
-                  Public name and identifiers for this store
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <FieldGroup className="gap-5">
-                  <Field data-invalid={fieldErrors.name ? true : undefined}>
-                    <FieldLabel htmlFor="name">Store name</FieldLabel>
-                    <Input
-                      id="name"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      disabled={fieldsDisabled}
-                      placeholder="Store A"
-                      aria-invalid={fieldErrors.name ? true : undefined}
-                    />
-                    <FieldDescription>
-                      Shown to customers on the storefront and in order emails
-                    </FieldDescription>
-                    {fieldErrors.name ? (
-                      <FieldError>{fieldErrors.name}</FieldError>
-                    ) : null}
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="slug">Slug</FieldLabel>
-                    <div className="flex gap-2">
-                      <Input
-                        id="slug"
-                        value={settings?.slug ?? ""}
-                        disabled
-                        readOnly
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        onClick={() => void copySlug()}
-                        aria-label="Copy slug"
-                      >
-                        {copied ? <Check /> : <Copy />}
-                      </Button>
-                    </div>
-                    <FieldDescription>
-                      URL identifier assigned at store creation. Ask a platform
-                      admin to change it.
-                    </FieldDescription>
-                  </Field>
-                  <Field>
-                    <FieldLabel>Store status</FieldLabel>
-                    <p className="text-sm">
-                      {settings?.status === "ACTIVE"
-                        ? "This store can sell. Status is managed by the platform."
-                        : "This store is inactive. Status is managed by the platform."}
-                    </p>
-                  </Field>
-                </FieldGroup>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Storefront</CardTitle>
-                <CardDescription>
-                  Domain and contact details exposed to customers
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <FieldGroup className="gap-5">
-                  <Field data-invalid={fieldErrors.domain ? true : undefined}>
-                    <FieldLabel htmlFor="domain">Domain</FieldLabel>
-                    <Input
-                      id="domain"
-                      value={domain}
-                      onChange={(e) => setDomain(e.target.value)}
-                      disabled={fieldsDisabled}
-                      placeholder="shop.example.com"
-                      aria-invalid={fieldErrors.domain ? true : undefined}
-                    />
-                    <FieldDescription>
-                      Public hostname for this store. Leave blank to use the
-                      slug only. DNS verification is not required yet.
-                    </FieldDescription>
-                    {fieldErrors.domain ? (
-                      <FieldError>{fieldErrors.domain}</FieldError>
-                    ) : null}
-                  </Field>
-                  <Field
-                    data-invalid={fieldErrors.contactEmail ? true : undefined}
-                  >
-                    <FieldLabel htmlFor="contact-email">Contact email</FieldLabel>
-                    <Input
-                      id="contact-email"
-                      type="email"
-                      value={contactEmail}
-                      onChange={(e) => setContactEmail(e.target.value)}
-                      disabled={fieldsDisabled}
-                      placeholder="hello@example.com"
-                      aria-invalid={
-                        fieldErrors.contactEmail ? true : undefined
-                      }
-                    />
-                    <FieldDescription>
-                      Customer-facing address for support and order questions
-                    </FieldDescription>
-                    {fieldErrors.contactEmail ? (
-                      <FieldError>{fieldErrors.contactEmail}</FieldError>
-                    ) : null}
-                  </Field>
-                </FieldGroup>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Regional</CardTitle>
-                <CardDescription>
-                  Currency is fixed to INR. Timezone controls dates shown in
-                  this admin.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <FieldGroup className="gap-5">
-                  <Field>
-                    <FieldLabel htmlFor="currency">Currency</FieldLabel>
-                    <Input id="currency" value="INR" disabled readOnly />
-                    <FieldDescription>
-                      All prices and orders use INR, stored as integer paise
-                    </FieldDescription>
-                  </Field>
-                  <Field data-invalid={fieldErrors.timezone ? true : undefined}>
-                    <FieldLabel htmlFor="timezone">Timezone</FieldLabel>
-                    <select
-                      id="timezone"
-                      className={selectClassName}
-                      value={timezone}
-                      onChange={(e) => setTimezone(e.target.value)}
-                      disabled={fieldsDisabled}
-                    >
-                      {timezoneOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                    {fieldErrors.timezone ? (
-                      <FieldError>{fieldErrors.timezone}</FieldError>
-                    ) : null}
-                  </Field>
-                </FieldGroup>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Shipping</CardTitle>
-                <CardDescription>
-                  Checkout shipping rules for this store (amounts in rupees)
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <FieldGroup className="gap-5">
-                  <Field
-                    data-invalid={fieldErrors.shippingMode ? true : undefined}
-                  >
-                    <FieldLabel htmlFor="shipping-mode">Mode</FieldLabel>
-                    <select
-                      id="shipping-mode"
-                      className={selectClassName}
-                      value={shippingMode}
-                      onChange={(e) =>
-                        setShippingMode(e.target.value as ShippingMode)
-                      }
-                      disabled={fieldsDisabled}
-                    >
-                      {SHIPPING_MODE_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                    {fieldErrors.shippingMode ? (
-                      <FieldError>{fieldErrors.shippingMode}</FieldError>
-                    ) : null}
-                  </Field>
-                  {shippingMode !== "off" ? (
-                    <Field
-                      data-invalid={fieldErrors.flatRupees ? true : undefined}
-                    >
-                      <FieldLabel htmlFor="flat-rupees">
-                        Flat shipping (₹)
-                      </FieldLabel>
-                      <Input
-                        id="flat-rupees"
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        value={flatRupees}
-                        onChange={(e) => setFlatRupees(e.target.value)}
-                        disabled={fieldsDisabled}
-                        placeholder="200"
-                        aria-invalid={
-                          fieldErrors.flatRupees ? true : undefined
-                        }
-                      />
-                      <FieldDescription>
-                        Charged when shipping applies. Stored as paise on save.
-                      </FieldDescription>
-                      {fieldErrors.flatRupees ? (
-                        <FieldError>{fieldErrors.flatRupees}</FieldError>
-                      ) : null}
-                    </Field>
-                  ) : null}
-                  {shippingMode === "free_over" ? (
-                    <Field
-                      data-invalid={
-                        fieldErrors.freeOverRupees ? true : undefined
-                      }
-                    >
-                      <FieldLabel htmlFor="free-over-rupees">
-                        Free over (₹)
-                      </FieldLabel>
-                      <Input
-                        id="free-over-rupees"
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        value={freeOverRupees}
-                        onChange={(e) => setFreeOverRupees(e.target.value)}
-                        disabled={fieldsDisabled}
-                        placeholder="500"
-                        aria-invalid={
-                          fieldErrors.freeOverRupees ? true : undefined
-                        }
-                      />
-                      <FieldDescription>
-                        Orders at or above this merchandise total ship free
-                      </FieldDescription>
-                      {fieldErrors.freeOverRupees ? (
-                        <FieldError>{fieldErrors.freeOverRupees}</FieldError>
-                      ) : null}
-                    </Field>
-                  ) : null}
-                </FieldGroup>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Tax</CardTitle>
-                <CardDescription>
-                  GST applied at checkout on discounted merchandise
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <FieldGroup className="gap-5">
-                  <Field
-                    data-invalid={fieldErrors.gstPercent ? true : undefined}
-                  >
-                    <FieldLabel htmlFor="gst-percent">GST percent</FieldLabel>
-                    <Input
-                      id="gst-percent"
-                      type="number"
-                      min={0}
-                      max={100}
-                      step="0.01"
-                      value={gstPercent}
-                      onChange={(e) => setGstPercent(e.target.value)}
-                      disabled={fieldsDisabled}
-                      placeholder="3"
-                      aria-invalid={fieldErrors.gstPercent ? true : undefined}
-                    />
-                    {fieldErrors.gstPercent ? (
-                      <FieldError>{fieldErrors.gstPercent}</FieldError>
-                    ) : null}
-                  </Field>
-                  <Field data-invalid={fieldErrors.gstin ? true : undefined}>
-                    <FieldLabel htmlFor="gstin">GSTIN</FieldLabel>
-                    <Input
-                      id="gstin"
-                      value={gstin}
-                      onChange={(e) => setGstin(e.target.value)}
-                      disabled={fieldsDisabled}
-                      placeholder="22AAAAA0000A1Z5"
-                      aria-invalid={fieldErrors.gstin ? true : undefined}
-                    />
-                    <FieldDescription>
-                      Shown on invoices and packing slips when set
-                    </FieldDescription>
-                    {fieldErrors.gstin ? (
-                      <FieldError>{fieldErrors.gstin}</FieldError>
-                    ) : null}
-                  </Field>
-                </FieldGroup>
-              </CardContent>
-            </Card>
-
-            {error ? <FieldError>{error}</FieldError> : null}
-            {!canManage ? (
-              <p className="text-sm text-muted-foreground">
-                You can view settings but do not have permission to change them.
-              </p>
-            ) : null}
-
-            <div className="sticky bottom-0 z-10 -mx-1 flex flex-wrap items-center justify-between gap-3 border-t bg-background/95 px-1 py-4 backdrop-blur">
-              <p className="text-sm text-muted-foreground">
-                {saved
-                  ? "Settings saved."
-                  : isDirty
-                    ? "You have unsaved changes."
-                    : "No pending changes."}
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={!isDirty || fieldsDisabled}
-                  onClick={discard}
-                >
-                  Discard
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={!isDirty || fieldsDisabled}
-                >
-                  {saveMutation.isPending ? "Saving..." : "Save settings"}
-                </Button>
-              </div>
-            </div>
-          </form>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Related</CardTitle>
-              <CardDescription>
-                Integrations managed on their own pages
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-2">
-              <Link
-                href="/admin/keys"
-                className="flex items-center gap-3 rounded-2xl px-3 py-3 hover:bg-muted/50"
-              >
-                <KeyRound className="size-4 text-muted-foreground" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium">API keys</p>
-                  <p className="text-sm text-muted-foreground">
-                    Publishable and secret keys for storefront and server access
-                  </p>
-                </div>
-              </Link>
-            </CardContent>
-          </Card>
-        </>
-      )}
+      </SettingsSectionLayout>
     </div>
   )
 }

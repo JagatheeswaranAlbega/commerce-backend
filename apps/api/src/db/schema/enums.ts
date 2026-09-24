@@ -47,3 +47,5 @@ export const inventoryMovementTypeEnum = pgEnum("inventory_movement_type", [
 export const discountTypeEnum = pgEnum("discount_type", ["PERCENTAGE", "FIXED_PAISE"]);
 
 export const discountStatusEnum = pgEnum("discount_status", ["ACTIVE", "INACTIVE"]);
+
+export const catalogItemSourceEnum = pgEnum("catalog_item_source", ["STORE", "GLOBAL"]);

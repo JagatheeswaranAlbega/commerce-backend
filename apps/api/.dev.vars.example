@@ -1,8 +1,4 @@
 ENVIRONMENT=development
-# Use the same database as migrate/seed. For Neon + wrangler Hyperdrive local:
-# - Prefer the DIRECT (non-pooler) connection string from the Neon dashboard
-#   (uncheck "connection pooling"). Hyperdrive already pools.
-# - Keep sslmode=require. Avoid channel_binding=require on Workers.
-DATABASE_URL="postgresql://postgres:admin@localhost:5432/ecommerce_multi_tenancy"
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/ecommerce_multi_tenancy"
 JWT_SECRET=replace-with-a-development-secret-at-least-32-chars
-FRONTEND_URL=http://localhost:3001
+FRONTEND_URL=http://localhost:3000

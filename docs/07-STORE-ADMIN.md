@@ -28,6 +28,7 @@ Reports
 
 Catalog
   ├── Products
+  ├── Global Catalog
   ├── Categories
   └── Collections
 

@@ -1,10 +1,12 @@
 "use client"
 
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { useMemo, useState } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import type { AppColumnDef } from "@/components/data-table"
 
+import { ConfirmDialog } from "@/components/admin/confirm-dialog"
 import { DataTableSkeleton } from "@/components/admin/data-table-skeleton"
 import {
   AdminFilterBar,
@@ -16,22 +18,29 @@ import {
   PlatformStoreFilter,
   usePlatformStoreFilter,
 } from "@/components/admin/platform-store-filter"
+import { RowActionsMenu } from "@/components/row-actions-menu"
 import { DataTable } from "@/components/data-table"
 import { ListPagination } from "@/components/list-pagination"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import {
+  deletePlatformStoreProduct,
   listPlatformProducts,
   type PlatformProduct,
 } from "@/lib/api/platform/products"
 import { listPlatformStores } from "@/lib/api/platform/stores"
+import { productFormHref } from "@/lib/api/store-catalog"
 import { ADMIN_TABLE_PAGE_SIZE } from "@/lib/admin-table"
 import { formatDate } from "@/lib/format"
 
 export function PlatformProducts() {
+  const router = useRouter()
+  const queryClient = useQueryClient()
   const { storeId, setStoreId } = usePlatformStoreFilter()
   const [page, setPage] = useState(1)
   const [statusFilter, setStatusFilter] = useState("ALL")
   const [search, setSearch] = useState("")
+  const [pendingDelete, setPendingDelete] = useState<PlatformProduct | null>(null)
 
   const storesQuery = useQuery({
     queryKey: ["platform", "stores"],
@@ -47,6 +56,15 @@ export function PlatformProducts() {
         storeId: storeId || undefined,
         status: statusFilter === "ALL" ? undefined : statusFilter,
       }),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (product: PlatformProduct) =>
+      deletePlatformStoreProduct(product.storeId, product.id),
+    onSuccess: async () => {
+      setPendingDelete(null)
+      await queryClient.invalidateQueries({ queryKey: ["platform", "products"] })
+    },
   })
 
   const filtered = useMemo(() => {
@@ -74,9 +92,15 @@ export function PlatformProducts() {
         id: "title",
         header: "Title",
         cell: ({ row }) => (
-          <span className="font-medium">
+          <Link
+            href={productFormHref(
+              `/admin/products/${row.original.id}`,
+              row.original.storeId
+            )}
+            className="font-medium hover:underline"
+          >
             {row.original.title ?? row.original.name}
-          </span>
+          </Link>
         ),
       },
       {
@@ -124,24 +148,55 @@ export function PlatformProducts() {
         header: "",
         enableSorting: false,
         cell: ({ row }) => (
-          <Link
-            href={`/admin/stores/${row.original.storeId}`}
-            className="text-sm text-muted-foreground underline-offset-4 hover:underline"
-          >
-            Open store
-          </Link>
+          <RowActionsMenu
+            label="Product actions"
+            items={[
+              {
+                label: "Edit",
+                onClick: () =>
+                  router.push(
+                    productFormHref(
+                      `/admin/products/${row.original.id}`,
+                      row.original.storeId
+                    )
+                  ),
+              },
+              {
+                label: "Delete",
+                variant: "destructive" as const,
+                disabled: deleteMutation.isPending,
+                onClick: () => setPendingDelete(row.original),
+              },
+            ]}
+          />
         ),
       },
     ],
-    [storesQuery.data?.data]
+    [deleteMutation.isPending, router, storesQuery.data?.data]
   )
 
   return (
     <div className="flex flex-col gap-6">
       <AdminPageHeader
         title="Products"
-        description="Read-only catalog visibility across stores"
+        description="Create and edit store-owned products. Imported Global Catalog items stay platform-managed."
         breadcrumbs={[{ label: "Products" }]}
+        actions={
+          storeId ? (
+            <Button
+              nativeButton={false}
+              render={
+                <Link href={productFormHref("/admin/products/create", storeId)} />
+              }
+            >
+              Create product
+            </Button>
+          ) : (
+            <Button type="button" disabled>
+              Select a store to create
+            </Button>
+          )
+        }
       />
 
       <AdminFilterBar
@@ -214,6 +269,25 @@ export function PlatformProducts() {
           />
         </>
       )}
+
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null)
+        }}
+        title="Delete product?"
+        description={
+          pendingDelete
+            ? `Delete “${pendingDelete.title ?? pendingDelete.name}”? This cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete"
+        destructive
+        pending={deleteMutation.isPending}
+        onConfirm={() => {
+          if (pendingDelete) deleteMutation.mutate(pendingDelete)
+        }}
+      />
     </div>
   )
 }

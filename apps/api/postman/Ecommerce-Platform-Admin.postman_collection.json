@@ -5,13 +5,38 @@
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "base_url", "value": "http://localhost:8787/api/v1" },
-    { "key": "jwt_token", "value": "" },
-    { "key": "store_id", "value": "" },
-    { "key": "product_id", "value": "" },
-    { "key": "order_id", "value": "" },
-    { "key": "key_id", "value": "" },
-    { "key": "customer_id", "value": "" }
+    {
+      "key": "base_url",
+      "value": "http://localhost:8787/api/v1"
+    },
+    {
+      "key": "jwt_token",
+      "value": ""
+    },
+    {
+      "key": "store_id",
+      "value": ""
+    },
+    {
+      "key": "product_id",
+      "value": ""
+    },
+    {
+      "key": "order_id",
+      "value": ""
+    },
+    {
+      "key": "key_id",
+      "value": ""
+    },
+    {
+      "key": "customer_id",
+      "value": ""
+    },
+    {
+      "key": "global_product_id",
+      "value": ""
+    }
   ],
   "item": [
     {
@@ -34,10 +59,15 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"platform@local.dev\",\n  \"password\": \"Platform@123\"\n}"
+              "raw": "{\n  \"email\": \"platform@admin.com\",\n  \"password\": \"Platform@123\"\n}"
             },
             "url": "{{base_url}}/auth/login"
           }
@@ -46,7 +76,12 @@
           "name": "Me",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/auth/me"
           }
         },
@@ -55,8 +90,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -69,7 +110,12 @@
           "name": "Refresh",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"refreshToken\": \"{{refresh_token}}\"\n}"
@@ -81,7 +127,12 @@
           "name": "Logout",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"refreshToken\": \"{{refresh_token}}\"\n}"
@@ -98,7 +149,12 @@
           "name": "Metrics",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/platform/metrics"
           }
         },
@@ -106,7 +162,12 @@
           "name": "List Stores",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/platform/stores"
           }
         },
@@ -132,12 +193,18 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"New Store\",\n  \"slug\": \"new-store\",\n  \"adminEmail\": \"admin@new-store.local\",\n  \"adminPassword\": \"StoreAdmin@123\"\n}"
+              "raw": "{\n  \"name\": \"New Store\",\n  \"slug\": \"new-store\"\n}"
             },
             "url": "{{base_url}}/platform/stores"
           }
@@ -146,7 +213,12 @@
           "name": "Get Store",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/platform/stores/{{store_id}}"
           }
         },
@@ -155,8 +227,14 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -168,8 +246,34 @@
         {
           "name": "Deactivate Store",
           "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"INACTIVE\"\n}"
+            },
+            "url": "{{base_url}}/platform/stores/{{store_id}}"
+          }
+        },
+        {
+          "name": "Delete Store",
+          "request": {
             "method": "DELETE",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/platform/stores/{{store_id}}"
           }
         },
@@ -177,7 +281,12 @@
           "name": "List Store Admins",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/platform/stores/{{store_id}}/admins"
           }
         },
@@ -186,12 +295,18 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"second-admin@store.local\",\n  \"password\": \"StoreAdmin@123\"\n}"
+              "raw": "{\n  \"email\": \"second-admin@store.local\",\n  \"password\": \"Admin@123\"\n}"
             },
             "url": "{{base_url}}/platform/stores/{{store_id}}/admins"
           }
@@ -201,8 +316,14 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -215,7 +336,12 @@
           "name": "Delete Store Admin",
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/platform/stores/{{store_id}}/admins/{{user_id}}"
           }
         },
@@ -223,7 +349,12 @@
           "name": "List Keys",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/platform/stores/{{store_id}}/keys"
           }
         },
@@ -249,8 +380,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -263,7 +400,12 @@
           "name": "Delete Key",
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/platform/stores/{{store_id}}/keys/{{key_id}}"
           }
         },
@@ -271,7 +413,12 @@
           "name": "List Products",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/platform/products"
           }
         },
@@ -279,7 +426,12 @@
           "name": "List Orders",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/platform/orders?page=1&pageSize=20&storeId={{store_id}}"
           }
         },
@@ -287,7 +439,12 @@
           "name": "Get Order",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/platform/orders/{{order_id}}"
           }
         },
@@ -295,7 +452,12 @@
           "name": "List Customers",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/platform/customers?page=1&pageSize=20&storeId={{store_id}}"
           }
         },
@@ -303,7 +465,12 @@
           "name": "Get Customer",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/platform/customers/{{customer_id}}"
           }
         },
@@ -311,7 +478,12 @@
           "name": "Audit Logs",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/platform/audit-logs?page=1&pageSize=20"
           }
         },
@@ -319,7 +491,12 @@
           "name": "Get Settings",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
             "url": "{{base_url}}/platform/settings"
           }
         },
@@ -328,14 +505,106 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"platformName\": \"Commerce Console\",\n  \"supportEmail\": \"support@example.com\"\n}"
             },
             "url": "{{base_url}}/platform/settings"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Global Catalog",
+      "item": [
+        {
+          "name": "List global categories",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": "{{base_url}}/platform/global-categories"
+          }
+        },
+        {
+          "name": "Create global category",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Fashion\",\n  \"slug\": \"fashion\"\n}"
+            },
+            "url": "{{base_url}}/platform/global-categories"
+          }
+        },
+        {
+          "name": "List global products",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": "{{base_url}}/platform/global-products?page=1&pageSize=20"
+          }
+        },
+        {
+          "name": "Create global product",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Everyday Cotton Tee\",\n  \"handle\": \"everyday-cotton-tee\",\n  \"status\": \"ACTIVE\"\n}"
+            },
+            "url": "{{base_url}}/platform/global-products"
+          }
+        },
+        {
+          "name": "Get global product",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": "{{base_url}}/platform/global-products/{{global_product_id}}"
           }
         }
       ]

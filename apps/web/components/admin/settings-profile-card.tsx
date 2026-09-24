@@ -4,6 +4,9 @@ import { useEffect, useState } from "react"
 import { useMutation } from "@tanstack/react-query"
 import { z } from "zod"
 
+import { KeyRound, Shield } from "lucide-react"
+
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -23,6 +26,16 @@ import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ApiError } from "@/lib/api"
 import { changePassword, type AuthUser } from "@/lib/auth"
+
+function initialsFromEmail(email: string | undefined) {
+  if (!email) return "?"
+  const local = email.split("@")[0] ?? email
+  const parts = local.split(/[._\-\s]+/).filter(Boolean)
+  if (parts.length >= 2) {
+    return `${parts[0]![0] ?? ""}${parts[1]![0] ?? ""}`.toUpperCase()
+  }
+  return local.slice(0, 2).toUpperCase()
+}
 
 const passwordSchema = z
   .object({
@@ -132,13 +145,34 @@ export function SettingsProfileCard({
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Profile</CardTitle>
-        <CardDescription>
-          Your signed-in account for this console
-        </CardDescription>
+      <CardHeader className="border-b">
+        <div className="flex items-start gap-3.5">
+          <div
+            aria-hidden
+            className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-sm font-semibold tracking-wide text-primary ring-1 ring-primary/15"
+          >
+            {initialsFromEmail(user?.email)}
+          </div>
+          <div className="min-w-0 space-y-1.5">
+            <CardTitle>Profile</CardTitle>
+            <CardDescription>
+              Your signed-in account for this console
+            </CardDescription>
+            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+              {user ? (
+                <Badge variant="secondary" className="gap-1 font-normal">
+                  <Shield className="size-3" />
+                  {roleLabel(user.role)}
+                </Badge>
+              ) : null}
+              <Badge variant="outline" className="font-normal">
+                {scopeLabel}
+              </Badge>
+            </div>
+          </div>
+        </div>
       </CardHeader>
-      <CardContent className="flex flex-col gap-8">
+      <CardContent className="flex flex-col gap-8 pt-(--card-spacing)">
         <FieldGroup className="gap-5">
           <Field>
             <FieldLabel htmlFor="profile-email">Email</FieldLabel>
@@ -150,28 +184,31 @@ export function SettingsProfileCard({
             />
             <FieldDescription>Sign-in address for this account</FieldDescription>
           </Field>
-          <Field>
-            <FieldLabel>Role</FieldLabel>
-            <p className="text-sm">
-              {user ? roleLabel(user.role) : "—"}
-            </p>
-          </Field>
-          <Field>
-            <FieldLabel>Access scope</FieldLabel>
-            <p className="text-sm">{scopeLabel}</p>
-            {scopeDescription ? (
-              <FieldDescription>{scopeDescription}</FieldDescription>
-            ) : null}
-          </Field>
+          {scopeDescription ? (
+            <Field>
+              <FieldLabel>Access scope</FieldLabel>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                {scopeDescription}
+              </p>
+            </Field>
+          ) : null}
         </FieldGroup>
 
-        <form onSubmit={onSubmit} className="flex flex-col gap-5 border-t pt-6">
-          <div>
-            <p className="text-sm font-medium">Change password</p>
-            <p className="text-sm text-muted-foreground">
-              Requires your current password. Other sessions will need to sign
-              in again.
-            </p>
+        <form
+          onSubmit={onSubmit}
+          className="flex flex-col gap-5 rounded-xl border border-border/80 bg-muted/25 p-4 sm:p-5"
+        >
+          <div className="flex items-start gap-3">
+            <span className="admin-kpi-icon mt-0.5">
+              <KeyRound className="size-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-medium">Change password</p>
+              <p className="text-sm text-muted-foreground">
+                Requires your current password. Other sessions will need to sign
+                in again.
+              </p>
+            </div>
           </div>
           <FieldGroup className="gap-5">
             <Field

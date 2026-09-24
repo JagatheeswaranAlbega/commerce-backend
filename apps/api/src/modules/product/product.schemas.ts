@@ -41,6 +41,7 @@ export const listProductsQuerySchema = paginationQuerySchema.extend({
   status: z.enum(["DRAFT", "ACTIVE", "ARCHIVED"]).optional(),
   categoryId: z.string().uuid().optional(),
   q: z.string().trim().min(1).max(200).optional(),
+  source: z.enum(["STORE", "GLOBAL"]).optional(),
 });
 
 export const listStorefrontProductsQuerySchema = paginationQuerySchema.extend({

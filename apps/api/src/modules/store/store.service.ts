@@ -2,6 +2,8 @@ import type { Database } from "@/db/client";
 import { stores } from "@/db/schema/stores";
 import { users } from "@/db/schema/users";
 import { apiKeys } from "@/db/schema/api-keys";
+import { cartLineItems } from "@/db/schema/cart-line-items";
+import { productImages } from "@/db/schema/product-images";
 import { storeSettings } from "@/db/schema/store-settings";
 import { and, count, desc, eq } from "drizzle-orm";
 import { generateApiKey, sha256Hex } from "@/infrastructure/crypto/api-key";
@@ -16,8 +18,6 @@ import { normalizeEmail, normalizeSlug } from "@/shared/tenant/normalize";
 export type CreateStoreInput = {
   name: string;
   slug: string;
-  adminEmail: string;
-  adminPassword: string;
 };
 
 export class StoreService {
@@ -49,28 +49,13 @@ export class StoreService {
 
   async create(input: CreateStoreInput) {
     const slug = normalizeSlug(input.slug);
-    const adminEmail = normalizeEmail(input.adminEmail);
     const existingSlug = await this.db.query.stores.findFirst({ where: eq(stores.slug, slug) });
     if (existingSlug) throw new DuplicateResourceError("Store slug already exists.");
-    const existingUser = await this.db.query.users.findFirst({ where: eq(users.email, adminEmail) });
-    if (existingUser) throw new DuplicateResourceError("Admin email already exists.");
 
     const [store] = await this.db
       .insert(stores)
       .values({ name: input.name, slug, status: "ACTIVE" })
       .returning();
-
-    const passwordHash = await hashPassword(input.adminPassword);
-    const [admin] = await this.db
-      .insert(users)
-      .values({
-        email: adminEmail,
-        passwordHash,
-        role: "STORE_ADMIN",
-        storeId: store!.id,
-        isActive: true,
-      })
-      .returning({ id: users.id, email: users.email, role: users.role, storeId: users.storeId });
 
     await this.db.insert(storeSettings).values([
       { storeId: store!.id, key: "currency", value: "INR" },
@@ -112,7 +97,6 @@ export class StoreService {
 
     return {
       store: store!,
-      admin,
       keys: {
         publishableKey: publishable.rawKey,
         secretKey: secret.rawKey,
@@ -135,6 +119,34 @@ export class StoreService {
 
   async deactivate(storeId: string) {
     return this.update(storeId, { status: "INACTIVE" });
+  }
+
+  async remove(storeId: string) {
+    return this.db.transaction(async (tx) => {
+      const store = await tx.query.stores.findFirst({ where: eq(stores.id, storeId) });
+      if (!store) throw new StoreNotFoundError();
+
+      const media = await tx.query.productImages.findMany({
+        where: eq(productImages.storeId, storeId),
+        columns: { storageKey: true },
+      });
+
+      // cart_line_items.variant_id is ON DELETE RESTRICT; remove lines before the store cascade.
+      await tx.delete(cartLineItems).where(eq(cartLineItems.storeId, storeId));
+
+      const [deleted] = await tx.delete(stores).where(eq(stores.id, storeId)).returning({
+        id: stores.id,
+        name: stores.name,
+        slug: stores.slug,
+      });
+      if (!deleted) throw new StoreNotFoundError();
+
+      return {
+        ...deleted,
+        status: store.status,
+        storageKeys: media.map((item) => item.storageKey),
+      };
+    });
   }
 
   async listAdmins(storeId: string) {

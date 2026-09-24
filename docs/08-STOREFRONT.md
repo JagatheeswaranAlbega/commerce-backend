@@ -4,6 +4,8 @@
 
 The Storefront API is the customer-facing API used by any frontend, mobile app, or future channel.
 
+Catalog listing and product-by-handle include both **store-local** products and **imported global** products (`source: STORE | GLOBAL`). Cart, wishlist, and checkout resolve variants through a sellable-variant helper that accepts local variants or imported ACTIVE global variants. Prices for global variants come from the platform master; stock is per-store inventory keyed by `(store_id, variant_id)`.
+
 There can be many frontends while there is still only one backend.
 
 ```text
@@ -68,6 +70,20 @@ variant must belong to Store A
 ```
 
 A Store A cart cannot contain a Store B variant.
+
+## 5b. Wishlist
+
+Authenticated customers can save variants to a per-store wishlist:
+
+```text
+POST /store/wishlist  { variantId }
+        ↓
+customer JWT + publishable key resolve Store A
+        ↓
+variant must belong to Store A and be ACTIVE
+```
+
+Wishlist is customer-owned (no guest wishlist). Duplicate adds are idempotent.
 
 ## 6. Checkout
 

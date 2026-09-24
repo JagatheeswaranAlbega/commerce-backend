@@ -8,7 +8,7 @@ import { DataTable, type AppColumnDef } from "@/components/data-table"
 import { Badge } from "@/components/ui/badge"
 import { getPlatformCustomer } from "@/lib/api/platform/customers"
 import { listPlatformStores } from "@/lib/api/platform/stores"
-import { formatDate } from "@/lib/format"
+import { formatDateTime } from "@/lib/format"
 import { formatPaise } from "@/lib/money"
 
 export function PlatformCustomerDetail() {
@@ -63,7 +63,7 @@ export function PlatformCustomerDetail() {
       {
         accessorKey: "createdAt",
         header: "Created",
-        cell: ({ row }) => formatDate(row.original.createdAt),
+        cell: ({ row }) => formatDateTime(row.original.createdAt),
       },
     ],
     []

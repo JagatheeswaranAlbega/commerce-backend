@@ -22,20 +22,25 @@ type AdminPageHeaderProps = {
   actions?: ReactNode
 }
 
-function shouldShowBreadcrumbs(
+function visibleBreadcrumbs(
   breadcrumbs: AdminBreadcrumb[] | undefined,
   title: string
-): breadcrumbs is AdminBreadcrumb[] {
-  if (!breadcrumbs || breadcrumbs.length === 0) return false
-  // Single crumb that only repeats the page title — hide (no navigation value).
+): AdminBreadcrumb[] {
+  if (!breadcrumbs || breadcrumbs.length === 0) return []
+  const last = breadcrumbs[breadcrumbs.length - 1]
+  // Last crumb that only repeats the page title — drop it (the h1 already shows it).
+  const trimmed =
+    !last.href && last.label === title
+      ? breadcrumbs.slice(0, -1)
+      : breadcrumbs
   if (
-    breadcrumbs.length === 1 &&
-    !breadcrumbs[0].href &&
-    breadcrumbs[0].label === title
+    trimmed.length === 1 &&
+    !trimmed[0].href &&
+    trimmed[0].label === title
   ) {
-    return false
+    return []
   }
-  return true
+  return trimmed
 }
 
 export function AdminPageHeader({
@@ -44,27 +49,26 @@ export function AdminPageHeader({
   breadcrumbs,
   actions,
 }: AdminPageHeaderProps) {
-  const showBreadcrumbs = shouldShowBreadcrumbs(breadcrumbs, title)
+  const crumbs = visibleBreadcrumbs(breadcrumbs, title)
 
   return (
     <div className="flex flex-col gap-1 sm:gap-3">
-      {showBreadcrumbs ? (
+      {crumbs.length > 0 ? (
         <Breadcrumb>
           <BreadcrumbList>
-            {breadcrumbs.map((crumb, index) => {
-              const isLast = index === breadcrumbs.length - 1
+            {crumbs.map((crumb, index) => {
               return (
                 <Fragment key={`${crumb.label}-${index}`}>
                   {index > 0 ? <BreadcrumbSeparator /> : null}
                   <BreadcrumbItem>
-                    {isLast || !crumb.href ? (
-                      <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
-                    ) : (
+                    {crumb.href ? (
                       <BreadcrumbLink
                         render={<GuardedLink href={crumb.href} />}
                       >
                         {crumb.label}
                       </BreadcrumbLink>
+                    ) : (
+                      <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
                     )}
                   </BreadcrumbItem>
                 </Fragment>

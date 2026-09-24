@@ -28,10 +28,10 @@ Postman collections: [`postman/`](./postman/).
 
 ## Smoke checklist
 
-1. Login as Store A admin (`/login` → `/admin`).
+1. Login as Alora Fashion admin (`/login` → `/admin`).
 2. Create product → add variant (price in paise) → upload image → set ACTIVE.
 3. Create collection → attach product → confirm storefront `GET /store/collections/:slug` returns products.
 4. Storefront: create cart → add line → checkout with `Idempotency-Key`.
 5. Admin: open order detail → fulfill with `trackingNumber` / `carrier`.
-6. Confirm Store B cannot access Store A resources (isolation tests: `npm run test`).
+6. Confirm Zentrix cannot access Alora Fashion resources (isolation tests: `npm run test`).
 

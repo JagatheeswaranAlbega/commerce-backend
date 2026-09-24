@@ -4,9 +4,9 @@ import type { AppEnv } from "@/shared/types/hono";
 
 function endHandle(c: Context<AppEnv>, handle: DatabaseHandle) {
   try {
-    c.executionCtx.waitUntil(handle.close());
+    c.executionCtx.waitUntil(handle.client.end({ timeout: 5 }));
   } catch {
-    void handle.close();
+    void handle.client.end({ timeout: 5 });
   }
 }
 

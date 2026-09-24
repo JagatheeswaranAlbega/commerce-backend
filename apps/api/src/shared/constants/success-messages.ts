@@ -29,6 +29,25 @@ export const SUCCESS_MESSAGES = {
   CATEGORY_UPDATED: "Category updated successfully",
   CATEGORY_DELETED: "Category deleted successfully",
 
+  // Global catalog
+  GLOBAL_CATEGORIES_RETRIEVED: "Global categories retrieved successfully",
+  GLOBAL_CATEGORY_RETRIEVED: "Global category retrieved successfully",
+  GLOBAL_CATEGORY_CREATED: "Global category created successfully",
+  GLOBAL_CATEGORY_UPDATED: "Global category updated successfully",
+  GLOBAL_CATEGORY_DELETED: "Global category deleted successfully",
+  GLOBAL_PRODUCTS_RETRIEVED: "Global products retrieved successfully",
+  GLOBAL_PRODUCT_RETRIEVED: "Global product retrieved successfully",
+  GLOBAL_PRODUCT_CREATED: "Global product created successfully",
+  GLOBAL_PRODUCT_UPDATED: "Global product updated successfully",
+  GLOBAL_PRODUCT_DELETED: "Global product deleted successfully",
+  GLOBAL_VARIANT_CREATED: "Global variant created successfully",
+  GLOBAL_VARIANT_UPDATED: "Global variant updated successfully",
+  GLOBAL_VARIANT_DELETED: "Global variant deleted successfully",
+  GLOBAL_PRODUCT_IMPORTED: "Global product imported into your store",
+  GLOBAL_PRODUCTS_IMPORTED: "Selected global products imported into your store",
+  GLOBAL_PRODUCTS_IMPORT_NONE: "No products were imported",
+  GLOBAL_PRODUCT_REMOVED: "Global product removed from your store",
+
   // Collections
   COLLECTIONS_RETRIEVED: "Collections retrieved successfully",
   COLLECTION_RETRIEVED: "Collection retrieved successfully",
@@ -93,6 +112,7 @@ export const SUCCESS_MESSAGES = {
   STORE_CREATED: "Store created successfully",
   STORE_UPDATED: "Store updated successfully",
   STORE_STATUS_CHANGED: "Status changed successfully",
+  STORE_DELETED: "Store deleted successfully",
   STORE_ADMINS_RETRIEVED: "Store admins retrieved successfully",
   STORE_ADMIN_CREATED: "Store admin created successfully",
   STORE_ADMIN_UPDATED: "Store admin updated successfully",
@@ -115,6 +135,11 @@ export const SUCCESS_MESSAGES = {
   ADDRESS_CREATED: "Address created successfully",
   ADDRESS_UPDATED: "Address updated successfully",
   ADDRESS_DELETED: "Address deleted successfully",
+
+  // Wishlist
+  WISHLIST_RETRIEVED: "Wishlist retrieved successfully",
+  WISHLIST_ITEM_ADDED: "Item added to wishlist successfully",
+  WISHLIST_ITEM_REMOVED: "Wishlist item removed successfully",
 
   // Health / misc
   HEALTH_OK: "Service is healthy",

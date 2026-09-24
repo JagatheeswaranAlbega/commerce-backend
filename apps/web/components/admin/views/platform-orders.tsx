@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { DataTable, type AppColumnDef } from "@/components/data-table"
@@ -23,7 +24,7 @@ import {
 } from "@/lib/api/platform/orders"
 import { listPlatformStores } from "@/lib/api/platform/stores"
 import { ADMIN_TABLE_PAGE_SIZE } from "@/lib/admin-table"
-import { formatDate } from "@/lib/format"
+import { formatDateTime } from "@/lib/format"
 import { formatPaise } from "@/lib/money"
 
 const STATUS_OPTIONS = [
@@ -37,11 +38,27 @@ const STATUS_OPTIONS = [
   { value: "REFUNDED", label: "Returned (restocked)" },
 ]
 
+function parseStatus(value: string | null) {
+  return STATUS_OPTIONS.some((option) => option.value === value) ? value! : "ALL"
+}
+
 export function PlatformOrders() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const { storeId, setStoreId } = usePlatformStoreFilter()
   const [page, setPage] = useState(1)
-  const [statusFilter, setStatusFilter] = useState("ALL")
+  const statusFilter = parseStatus(searchParams.get("status"))
   const [search, setSearch] = useState("")
+
+  function setStatusFilter(next: string) {
+    const params = new URLSearchParams(searchParams.toString())
+    if (next === "ALL") params.delete("status")
+    else params.set("status", next)
+    const query = params.toString()
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
+    setPage(1)
+  }
 
   const storesQuery = useQuery({
     queryKey: ["platform", "stores"],
@@ -108,14 +125,14 @@ export function PlatformOrders() {
         accessorKey: "createdAt",
         header: "Created",
         sortFn: "datetime",
-        cell: ({ row }) => formatDate(row.original.createdAt),
+        cell: ({ row }) => formatDateTime(row.original.createdAt),
       },
       {
         accessorKey: "updatedAt",
         header: "Updated",
         sortFn: "datetime",
         cell: ({ row }) =>
-          row.original.updatedAt ? formatDate(row.original.updatedAt) : "—",
+          row.original.updatedAt ? formatDateTime(row.original.updatedAt) : "—",
       },
     ],
     [storesQuery.data?.data]
@@ -139,7 +156,6 @@ export function PlatformOrders() {
           setStoreId("")
           setStatusFilter("ALL")
           setSearch("")
-          setPage(1)
         }}
         end={
           <AdminFilterSearch
@@ -165,7 +181,6 @@ export function PlatformOrders() {
           value={statusFilter}
           onChange={(value) => {
             setStatusFilter(value)
-            setPage(1)
           }}
           options={STATUS_OPTIONS}
         />

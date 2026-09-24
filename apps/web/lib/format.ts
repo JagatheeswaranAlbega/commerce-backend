@@ -26,3 +26,20 @@ export function formatDate(value: string, timeZone?: string): string {
     ...(zone ? { timeZone: zone } : {}),
   })
 }
+
+/** Date + time for order placement and similar event timestamps. */
+export function formatDateTime(value: string, timeZone?: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+  const zone = timeZone ?? defaultFormatTimeZone
+  return date.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    ...(zone ? { timeZone: zone } : {}),
+  })
+}

@@ -5,6 +5,10 @@ import { scheduleDbClose, useRequestDb } from "@/middleware/database";
 import { StoreService } from "@/modules/store/store.service";
 import { ProductService } from "@/modules/product/product.service";
 import { listProductsQuerySchema } from "@/modules/product/product.schemas";
+import {
+  registerStoreProductRoutes,
+  resolveStoreIdFromPath,
+} from "@/modules/product/product.store.routes";
 import { AUDIT_ACTIONS, actorFromAuth, writeAuditLog } from "@/modules/audit";
 import {
   buildSalesCsv,
@@ -27,6 +31,7 @@ import { HTTP_STATUS } from "@/shared/constants/http";
 import { SUCCESS_MESSAGES } from "@/shared/constants/success-messages";
 import { paginationQuerySchema } from "@/shared/pagination/pagination.schema";
 import { buildPaginationMeta, paginationOffset } from "@/shared/pagination/pagination";
+import { registerPlatformGlobalCatalogRoutes } from "@/modules/global-catalog/global-catalog.platform.routes";
 
 const createStoreSchema = z.object({
   name: z.string().min(1).max(200),
@@ -35,8 +40,6 @@ const createStoreSchema = z.object({
     .min(1)
     .max(100)
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
-  adminEmail: z.string().email(),
-  adminPassword: z.string().min(8),
 });
 
 const updateStoreSchema = z.object({
@@ -236,6 +239,16 @@ export function createPlatformRoutes() {
         resourceId: storeId,
         metadata: { status: store.status, via: "patch" },
       });
+    } else if (parsed.data.status === "ACTIVE") {
+      const actor = actorFromAuth(c.get("auth"));
+      await writeAuditLog(db, {
+        storeId,
+        actorUserId: actor.actorUserId,
+        action: AUDIT_ACTIONS.STORE_ACTIVATE,
+        resourceType: "store",
+        resourceId: storeId,
+        metadata: { status: store.status, via: "patch" },
+      });
     }
     return sendSuccess(c, store, { message: SUCCESS_MESSAGES.STORE_UPDATED });
   });
@@ -244,17 +257,27 @@ export function createPlatformRoutes() {
     const { db, opened } = await useRequestDb(c);
     if (opened) scheduleDbClose(c, opened);
     const storeId = c.req.param("storeId");
-    const store = await new StoreService(db).deactivate(storeId);
+    const removed = await new StoreService(db).remove(storeId);
     const actor = actorFromAuth(c.get("auth"));
     await writeAuditLog(db, {
-      storeId,
+      storeId: null,
       actorUserId: actor.actorUserId,
-      action: AUDIT_ACTIONS.STORE_DEACTIVATE,
+      action: AUDIT_ACTIONS.STORE_DELETE,
       resourceType: "store",
-      resourceId: storeId,
-      metadata: { status: store.status },
+      resourceId: removed.id,
+      metadata: { name: removed.name, slug: removed.slug, status: removed.status },
     });
-    return sendSuccess(c, store, { message: SUCCESS_MESSAGES.STORE_STATUS_CHANGED });
+    if (c.env.PRODUCT_MEDIA && removed.storageKeys.length > 0) {
+      const { deleteObject } = await import("@/infrastructure/r2/product-media");
+      await Promise.allSettled(
+        removed.storageKeys.map((key) => deleteObject(c.env.PRODUCT_MEDIA!, key)),
+      );
+    }
+    return sendSuccess(
+      c,
+      { id: removed.id, name: removed.name, slug: removed.slug, deleted: true as const },
+      { message: SUCCESS_MESSAGES.STORE_DELETED },
+    );
   });
 
   app.get("/stores/:storeId/admins", async (c) => {
@@ -570,6 +593,13 @@ export function createPlatformRoutes() {
     return sendSuccess(c, toPlatformSettingsDto(items), {
       message: SUCCESS_MESSAGES.SETTINGS_SAVED,
     });
+  });
+
+  registerPlatformGlobalCatalogRoutes(app);
+
+  registerStoreProductRoutes(app, resolveStoreIdFromPath, {
+    includeCategoryList: true,
+    pathPrefix: "/stores/:storeId",
   });
 
   return app;

@@ -1,7 +1,6 @@
 import { index, integer, pgTable, text, uuid } from "drizzle-orm/pg-core";
 import { timestamps } from "./columns";
-import { inventoryMovementTypeEnum } from "./enums";
-import { productVariants } from "./product-variants";
+import { catalogItemSourceEnum, inventoryMovementTypeEnum } from "./enums";
 import { stores } from "./stores";
 
 export const inventoryMovements = pgTable(
@@ -11,9 +10,9 @@ export const inventoryMovements = pgTable(
     storeId: uuid("store_id")
       .notNull()
       .references(() => stores.id, { onDelete: "cascade" }),
-    variantId: uuid("variant_id")
-      .notNull()
-      .references(() => productVariants.id, { onDelete: "cascade" }),
+    /** STORE or GLOBAL variant id; validated in application layer. */
+    variantId: uuid("variant_id").notNull(),
+    source: catalogItemSourceEnum("source").notNull().default("STORE"),
     type: inventoryMovementTypeEnum("type").notNull(),
     quantity: integer("quantity").notNull(),
     reference: text("reference"),
