@@ -1,4 +1,5 @@
 import { apiFetch, apiFetchList, toQueryString, type PaginationMeta } from "@/lib/api"
+import type { ProductStatus } from "@/lib/api/admin/products"
 
 export type AdminCollection = {
   id: string
@@ -14,7 +15,7 @@ export type AdminCollectionProduct = {
   id: string
   title: string
   handle: string
-  status: string
+  status: ProductStatus
 }
 
 export type CreateCollectionInput = {

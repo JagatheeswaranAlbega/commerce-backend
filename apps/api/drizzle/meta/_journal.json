@@ -71,6 +71,13 @@
       "when": 1789986549927,
       "tag": "0009_loud_luckman",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790252073339,
+      "tag": "0010_customer_profile_fields",
+      "breakpoints": true
     }
   ]
 }

@@ -158,7 +158,7 @@ Store Admin can create percentage or fixed codes with optional:
 - Minimum order (paise)
 - Total usage limit
 
-Rules are enforced when customers apply a code and at checkout. Usage count increases only after a successful order. Payments and emails remain out of scope.
+Rules are enforced when customers apply a code and at checkout. Usage count increases only after a successful order. Payments remain out of scope. Order-placed email is sent after checkout when ZeptoMail is configured.
 
 ## 9. Customer Flow
 

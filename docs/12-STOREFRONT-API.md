@@ -666,6 +666,34 @@ Copy a saved customer address onto the cart.
 
 **Response `data`:** Cart (also sets `customerId`)
 
+Creating a cart with a customer JWT, or attaching a customer with `POST /store/carts/:cartId/customer`, copies the customer's default saved address onto the cart when the cart has no shipping snapshot yet.
+
+---
+
+### POST `/store/carts/:cartId/shipping-address/save`
+
+Copy the cart shipping snapshot into the authenticated customer's address book.
+
+**Headers:** `x-publishable-key`, `Authorization: Bearer <customer_token>`
+
+**Request body:**
+
+```json
+{
+  "isDefault": false
+}
+```
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `isDefault` | no | If omitted, the first saved address still becomes default |
+
+**Status:** `201`
+
+**Response `data`:** Address
+
+Returns `422` if the cart has no shipping snapshot. Does not change existing orders.
+
 ---
 
 ### POST `/store/carts/:cartId/email`
@@ -733,6 +761,8 @@ Cart becomes `CHECKED_OUT`. Inventory is decremented.
 
 Payments are not collected at checkout (orders are created as `PENDING`).
 
+When ZeptoMail is configured (`ZEPTOMAIL_TOKEN` + `ZEPTOMAIL_FROM`), the API sends an order-placed confirmation to the order contact email after a **new** checkout. Idempotent replay does not send again. Mail failure does not change the order response.
+
 ---
 
 ## Customer auth
@@ -770,6 +800,9 @@ Payments are not collected at checkout (orders are created as `PENDING`).
     "id": "uuid",
     "email": "customer@example.com",
     "name": "Test Customer",
+    "phone": "9999999999",
+    "dateOfBirth": null,
+    "gender": null,
     "storeId": "uuid"
   }
 }
@@ -805,9 +838,40 @@ Payments are not collected at checkout (orders are created as `PENDING`).
   "id": "uuid",
   "email": "customer@example.com",
   "name": "Test Customer",
+  "phone": "9999999999",
+  "dateOfBirth": null,
+  "gender": null,
   "storeId": "uuid"
 }
 ```
+
+---
+
+### PATCH `/store/auth/me`
+
+Update the authenticated customer profile. Email is the login identity and cannot be changed.
+
+**Headers:** `x-publishable-key`, `Authorization: Bearer <customer_token>`
+
+**Request body:** any subset of the fields below (at least one field)
+
+```json
+{
+  "name": "Test Customer",
+  "phone": "9999999999",
+  "dateOfBirth": "1994-05-20",
+  "gender": "FEMALE"
+}
+```
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `name` | no | Min 1 character |
+| `phone` | no | String or `null` to clear |
+| `dateOfBirth` | no | `YYYY-MM-DD` or `null`; cannot be in the future |
+| `gender` | no | `MALE` \| `FEMALE` \| `OTHER` \| `PREFER_NOT_TO_SAY` or `null` |
+
+**Response `data`:** same customer object as `GET /store/auth/me`
 
 ---
 
@@ -885,7 +949,17 @@ Requires customer JWT.
 
 **Headers:** `x-publishable-key`, `Authorization: Bearer <customer_token>`
 
-**Response `data`:** `Address[]` (newest first)
+**Response `data`:** `Address[]` (default first, then newest)
+
+The first saved address becomes default when the customer has none. Setting `isDefault: true` clears default on other addresses. Deleting the default promotes the newest remaining address.
+
+---
+
+### GET `/store/addresses/:addressId`
+
+**Headers:** `x-publishable-key`, `Authorization: Bearer <customer_token>`
+
+**Response `data`:** Address owned by the authenticated customer
 
 ---
 
@@ -1062,16 +1136,19 @@ Remove by variant id (handy for heart toggles without looking up the wishlist ro
 | POST | `/api/v1/store/carts/:cartId/discount` | publishable |
 | POST | `/api/v1/store/carts/:cartId/shipping-address` | publishable |
 | POST | `/api/v1/store/carts/:cartId/shipping-address/from-saved` | publishable + customer |
+| POST | `/api/v1/store/carts/:cartId/shipping-address/save` | publishable + customer |
 | POST | `/api/v1/store/carts/:cartId/email` | publishable |
 | POST | `/api/v1/store/carts/:cartId/checkout` | publishable (+ optional customer) |
 | POST | `/api/v1/store/auth/register` | publishable |
 | POST | `/api/v1/store/auth/login` | publishable |
 | GET | `/api/v1/store/auth/me` | publishable + customer |
+| PATCH | `/api/v1/store/auth/me` | publishable + customer |
 | GET | `/api/v1/store/orders/lookup` | publishable |
 | GET | `/api/v1/store/orders` | publishable + customer |
 | GET | `/api/v1/store/orders/:orderId` | publishable + customer |
 | POST | `/api/v1/store/orders/:orderId/return` | publishable + customer |
 | GET | `/api/v1/store/addresses` | publishable + customer |
+| GET | `/api/v1/store/addresses/:addressId` | publishable + customer |
 | POST | `/api/v1/store/addresses` | publishable + customer |
 | PATCH | `/api/v1/store/addresses/:addressId` | publishable + customer |
 | DELETE | `/api/v1/store/addresses/:addressId` | publishable + customer |
@@ -1092,8 +1169,11 @@ Remove by variant id (handy for heart toggles without looking up the wishlist ro
 5. POST /store/carts/:cartId/discount    { code }            (optional)
 6. POST /store/carts/:cartId/shipping-address  { ... }
    — or login + POST .../shipping-address/from-saved
+   — logged-in carts may already have the default saved address
+   — optional POST .../shipping-address/save to add cart shipping to the address book
 7. POST /store/carts/:cartId/email       { email }           (or pass email at checkout)
 8. POST /store/carts/:cartId/checkout    (+ Idempotency-Key)
+   → API emails order.email when ZeptoMail is configured
 ```
 
 Related Postman collection: `apps/api/postman/Ecommerce-Storefront.postman_collection.json`

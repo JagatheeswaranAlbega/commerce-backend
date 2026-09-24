@@ -132,6 +132,7 @@ export const SUCCESS_MESSAGES = {
 
   // Addresses
   ADDRESSES_RETRIEVED: "Addresses retrieved successfully",
+  ADDRESS_RETRIEVED: "Address retrieved successfully",
   ADDRESS_CREATED: "Address created successfully",
   ADDRESS_UPDATED: "Address updated successfully",
   ADDRESS_DELETED: "Address deleted successfully",

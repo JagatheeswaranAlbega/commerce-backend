@@ -193,7 +193,7 @@ Store ID comes from authenticated context, not the request body.
 - `PATCH /admin/discounts/:discountId`
 - `DELETE /admin/discounts/:discountId`
 
-Rules (enforced on cart apply + checkout): schedule window, min order subtotal, total usage limit. `usageCount` increments on successful checkout only. No payment refunds / emails in this product slice.
+Rules (enforced on cart apply + checkout): schedule window, min order subtotal, total usage limit. `usageCount` increments on successful checkout only. No payment refunds in this product slice. Order-placed email is sent after checkout when ZeptoMail is configured.
 
 ## 4. Storefront API
 
@@ -231,12 +231,27 @@ x-publishable-key: pk_live_...
 - `PATCH /store/carts/:cartId/items/:itemId`
 - `DELETE /store/carts/:cartId/items/:itemId`
 - `POST /store/carts/:cartId/shipping-address`
+- `POST /store/carts/:cartId/shipping-address/from-saved`
+- `POST /store/carts/:cartId/shipping-address/save`
+- `POST /store/carts/:cartId/customer`
+
+### Customer account
+
+- `POST /store/auth/register`
+- `POST /store/auth/login`
+- `GET /store/auth/me`
+- `PATCH /store/auth/me`
+- `GET /store/addresses`
+- `GET /store/addresses/:addressId`
+- `POST /store/addresses`
+- `PATCH /store/addresses/:addressId`
+- `DELETE /store/addresses/:addressId`
 
 ### Checkout
 
 - `POST /store/carts/:cartId/checkout` — requires email (body, cart, or logged-in customer)
 
-The checkout flow should validate inventory and create the order transactionally. Totals use store shipping/tax settings.
+The checkout flow should validate inventory and create the order transactionally. Totals use store shipping/tax settings. After a successful create (not an idempotent replay), the API sends an order-placed mail to `order.email` via ZeptoMail when `ZEPTOMAIL_TOKEN` and `ZEPTOMAIL_FROM` are set. Mail failure does not fail checkout.
 
 ### Customer orders / returns
 

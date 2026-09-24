@@ -15,6 +15,10 @@ function readStringRecord(source: EnvSource): EnvSource {
     DATABASE_URL: source.DATABASE_URL,
     JWT_SECRET: source.JWT_SECRET,
     FRONTEND_URL: source.FRONTEND_URL,
+    ZEPTOMAIL_TOKEN: source.ZEPTOMAIL_TOKEN,
+    ZEPTOMAIL_FROM: source.ZEPTOMAIL_FROM,
+    ZEPTOMAIL_FROM_NAME: source.ZEPTOMAIL_FROM_NAME,
+    ZEPTOMAIL_API_URL: source.ZEPTOMAIL_API_URL,
   };
 }
 

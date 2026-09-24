@@ -15,6 +15,8 @@ const SENSITIVE_BODY_KEYS = new Set([
   "publishableKey",
   "secretKey",
   "authorization",
+  "ZEPTOMAIL_TOKEN",
+  "zeptomailToken",
 ]);
 
 function redactString(value: string): string {

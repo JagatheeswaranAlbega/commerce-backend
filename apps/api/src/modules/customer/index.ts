@@ -1,0 +1,26 @@
+export {
+  applyDefaultShippingToCart,
+  cartHasShippingSnapshot,
+  deleteCustomerAddress,
+  findDefaultCustomerAddress,
+  getCustomerAddress,
+  insertCustomerAddress,
+  listCustomerAddresses,
+  presentCustomer,
+  shippingFieldsFromAddress,
+  updateCustomerProfile,
+  type AddressWriteInput,
+  type CartShippingSnapshot,
+  type CustomerProfile,
+  type CustomerRow,
+} from "./customer";
+export {
+  CUSTOMER_GENDERS,
+  addressBodySchema,
+  customerDateOfBirthSchema,
+  customerGenderSchema,
+  saveCartShippingSchema,
+  updateAddressBodySchema,
+  updateCustomerProfileSchema,
+  type CustomerGender,
+} from "./customer.schemas";

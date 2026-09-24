@@ -21,7 +21,22 @@ import {
   normalizeDiscountCode,
   tryIncrementDiscountUsage,
 } from "@/modules/discount";
-import { computeCheckoutTotals } from "@/modules/checkout";
+import { computeCheckoutTotals, notifyOrderPlaced, zeptoMailConfigFromEnv } from "@/modules/checkout";
+import {
+  addressBodySchema,
+  applyDefaultShippingToCart,
+  cartHasShippingSnapshot,
+  deleteCustomerAddress,
+  getCustomerAddress,
+  insertCustomerAddress,
+  listCustomerAddresses,
+  presentCustomer,
+  saveCartShippingSchema,
+  shippingFieldsFromAddress,
+  updateAddressBodySchema,
+  updateCustomerProfile,
+  updateCustomerProfileSchema,
+} from "@/modules/customer";
 import {
   loadStoreCommerceSettings,
   type StoreCommerceSettings,
@@ -46,9 +61,8 @@ import { orderItems } from "@/db/schema/order-items";
 import { inventory } from "@/db/schema/inventory";
 import { inventoryMovements } from "@/db/schema/inventory-movements";
 import { hashPassword, verifyPassword } from "@/infrastructure/crypto/password";
-import { signAuthToken, extractBearerToken, verifyAuthToken } from "@/modules/auth/jwt";
-import { ACCESS_TYPES } from "@/modules/auth/auth.types";
-import { AUTHORIZATION_HEADER, IDEMPOTENCY_KEY_HEADER } from "@/shared/constants/headers";
+import { signAuthToken } from "@/modules/auth/jwt";
+import { IDEMPOTENCY_KEY_HEADER } from "@/shared/constants/headers";
 import { sendSuccess } from "@/shared/response/success";
 import {
   DuplicateResourceError,
@@ -147,18 +161,6 @@ async function refreshCartDiscount(db: Database, sid: string, cartId: string) {
 
   return loadPresentedCart(db, sid, cart.id);
 }
-
-const addressBodySchema = z.object({
-  name: z.string().min(1),
-  phone: z.string().optional(),
-  addressLine1: z.string().min(1),
-  addressLine2: z.string().optional(),
-  city: z.string().min(1),
-  state: z.string().optional(),
-  postalCode: z.string().min(1),
-  country: z.string().default("IN"),
-  isDefault: z.boolean().optional(),
-});
 
 export function createStorefrontRoutes() {
   const app = new Hono<AppEnv>();
@@ -435,8 +437,10 @@ export function createStorefrontRoutes() {
         discountTotalPaise: 0,
       })
       .returning();
-    const commerce = await loadStoreCommerceSettings(db, sid);
-    return sendSuccess(c, presentCart({ ...cart, items: [] }, commerce), {
+    if (customerId) {
+      await applyDefaultShippingToCart(db, sid, cart!.id, customerId, cart!);
+    }
+    return sendSuccess(c, await loadPresentedCart(db, sid, cart!.id), {
       message: SUCCESS_MESSAGES.CART_CREATED,
       status: HTTP_STATUS.CREATED,
     });
@@ -482,6 +486,7 @@ export function createStorefrontRoutes() {
       .update(carts)
       .set({ customerId, updatedAt: new Date() })
       .where(eq(carts.id, cart.id));
+    await applyDefaultShippingToCart(db, sid, cart.id, customerId, cart);
     return sendSuccess(c, await loadPresentedCart(db, sid, cart.id), {
       message: SUCCESS_MESSAGES.CART_RETRIEVED,
     });
@@ -641,7 +646,7 @@ export function createStorefrontRoutes() {
         shippingCity: body.data.city,
         shippingState: body.data.state ?? null,
         shippingPostalCode: body.data.postalCode,
-        shippingCountry: body.data.country,
+        shippingCountry: body.data.country ?? "IN",
         updatedAt: new Date(),
       })
       .where(and(eq(carts.id, c.req.param("cartId")), eq(carts.storeId, sid)))
@@ -671,14 +676,7 @@ export function createStorefrontRoutes() {
       .update(carts)
       .set({
         customerId,
-        shippingName: address.name,
-        shippingPhone: address.phone,
-        shippingAddressLine1: address.addressLine1,
-        shippingAddressLine2: address.addressLine2,
-        shippingCity: address.city,
-        shippingState: address.state,
-        shippingPostalCode: address.postalCode,
-        shippingCountry: address.country,
+        ...shippingFieldsFromAddress(address),
         updatedAt: new Date(),
       })
       .where(and(eq(carts.id, c.req.param("cartId")), eq(carts.storeId, sid)))
@@ -686,6 +684,40 @@ export function createStorefrontRoutes() {
     if (!cart) throw new NotFoundError("Cart not found.");
     return sendSuccess(c, await loadPresentedCart(db, sid, cart.id), {
       message: SUCCESS_MESSAGES.CART_ADDRESS_UPDATED,
+    });
+  });
+
+  app.post("/carts/:cartId/shipping-address/save", async (c) => {
+    const body = saveCartShippingSchema.safeParse(await c.req.json().catch(() => ({})));
+    if (!body.success) throw new ValidationError("Invalid address.", body.error.flatten());
+    const { db, opened } = await useRequestDb(c);
+    if (opened) scheduleDbClose(c, opened);
+    const sid = storeId(c);
+    const customerId = await requireCustomerId(c, sid);
+    const cart = await loadCart(db, sid, c.req.param("cartId"));
+    if (!cartHasShippingSnapshot(cart)) {
+      throw new ValidationError("Shipping address is required.");
+    }
+    const address = await insertCustomerAddress(db, sid, customerId, {
+      name: cart.shippingName!,
+      phone: cart.shippingPhone,
+      addressLine1: cart.shippingAddressLine1!,
+      addressLine2: cart.shippingAddressLine2,
+      city: cart.shippingCity!,
+      state: cart.shippingState,
+      postalCode: cart.shippingPostalCode!,
+      country: cart.shippingCountry ?? "IN",
+      isDefault: body.data.isDefault,
+    });
+    if (!cart.customerId) {
+      await db
+        .update(carts)
+        .set({ customerId, updatedAt: new Date() })
+        .where(eq(carts.id, cart.id));
+    }
+    return sendSuccess(c, address, {
+      message: SUCCESS_MESSAGES.ADDRESS_CREATED,
+      status: HTTP_STATUS.CREATED,
     });
   });
 
@@ -890,6 +922,24 @@ export function createStorefrontRoutes() {
         await clearInventoryReservation(c, sid, item.variantId, `checkout:${cart.id}`);
       }
 
+      if (full) {
+        const store = await db.query.stores.findFirst({ where: eq(stores.id, sid) });
+        const settings = await db.query.storeSettings.findMany({
+          where: eq(storeSettings.storeId, sid),
+        });
+        const settingsMap = Object.fromEntries(settings.map((item) => [item.key, item.value]));
+        const contactEmail =
+          typeof settingsMap.contactEmail === "string" && settingsMap.contactEmail.trim()
+            ? settingsMap.contactEmail.trim()
+            : null;
+        await notifyOrderPlaced({
+          config: zeptoMailConfigFromEnv(c.env),
+          storeName: store?.name ?? "Store",
+          replyTo: contactEmail,
+          order: full,
+        });
+      }
+
       return sendSuccess(c, full, {
         message: SUCCESS_MESSAGES.ORDER_CREATED,
         status: HTTP_STATUS.CREATED,
@@ -939,7 +989,7 @@ export function createStorefrontRoutes() {
       c,
       {
         accessToken,
-        customer: { id: customer!.id, email: customer!.email, name: customer!.name, storeId: sid },
+        customer: presentCustomer(customer!),
       },
       {
         message: SUCCESS_MESSAGES.CUSTOMER_REGISTERED,
@@ -970,37 +1020,34 @@ export function createStorefrontRoutes() {
       c,
       {
         accessToken,
-        customer: { id: customer.id, email: customer.email, name: customer.name, storeId: sid },
+        customer: presentCustomer(customer),
       },
       { message: SUCCESS_MESSAGES.CUSTOMER_LOGGED_IN },
     );
   });
 
   app.get("/auth/me", async (c) => {
-    const token = extractBearerToken(c.req.header(AUTHORIZATION_HEADER));
-    if (!token) throw new UnauthorizedError();
-    const payload = await verifyAuthToken(token, { secret: c.env?.JWT_SECRET || process.env.JWT_SECRET });
-    if (payload.typ !== "customer" || payload.storeId !== storeId(c)) throw new UnauthorizedError();
+    const sid = storeId(c);
+    const customerId = await requireCustomerId(c, sid);
     const { db, opened } = await useRequestDb(c);
     if (opened) scheduleDbClose(c, opened);
-    const customer = await db.query.customers.findFirst({ where: eq(customers.id, payload.sub) });
-    if (!customer) throw new UnauthorizedError();
-    c.set("auth", {
-      accessType: ACCESS_TYPES.CUSTOMER,
-      customerId: customer.id,
-      storeId: customer.storeId,
-      email: customer.email,
+    const customer = await db.query.customers.findFirst({
+      where: and(eq(customers.id, customerId), eq(customers.storeId, sid)),
     });
-    return sendSuccess(
-      c,
-      {
-        id: customer.id,
-        email: customer.email,
-        name: customer.name,
-        storeId: customer.storeId,
-      },
-      { message: SUCCESS_MESSAGES.CUSTOMER_RETRIEVED },
-    );
+    if (!customer) throw new UnauthorizedError();
+    return sendSuccess(c, presentCustomer(customer), { message: SUCCESS_MESSAGES.CUSTOMER_RETRIEVED });
+  });
+
+  app.patch("/auth/me", async (c) => {
+    const body = updateCustomerProfileSchema.safeParse(await c.req.json());
+    if (!body.success) throw new ValidationError("Invalid profile.", body.error.flatten());
+    const sid = storeId(c);
+    const customerId = await requireCustomerId(c, sid);
+    const { db, opened } = await useRequestDb(c);
+    if (opened) scheduleDbClose(c, opened);
+    const updated = await updateCustomerProfile(db, sid, customerId, body.data);
+    if (!updated) throw new UnauthorizedError();
+    return sendSuccess(c, presentCustomer(updated), { message: SUCCESS_MESSAGES.CUSTOMER_UPDATED });
   });
 
   app.get("/orders", async (c) => {
@@ -1114,11 +1161,18 @@ export function createStorefrontRoutes() {
     const customerId = await requireCustomerId(c, sid);
     const { db, opened } = await useRequestDb(c);
     if (opened) scheduleDbClose(c, opened);
-    const items = await db.query.customerAddresses.findMany({
-      where: and(eq(customerAddresses.storeId, sid), eq(customerAddresses.customerId, customerId)),
-      orderBy: [desc(customerAddresses.createdAt)],
-    });
+    const items = await listCustomerAddresses(db, sid, customerId);
     return sendSuccess(c, items, { message: SUCCESS_MESSAGES.ADDRESSES_RETRIEVED });
+  });
+
+  app.get("/addresses/:addressId", async (c) => {
+    const sid = storeId(c);
+    const customerId = await requireCustomerId(c, sid);
+    const { db, opened } = await useRequestDb(c);
+    if (opened) scheduleDbClose(c, opened);
+    const address = await getCustomerAddress(db, sid, customerId, c.req.param("addressId"));
+    if (!address) throw new NotFoundError("Address not found.");
+    return sendSuccess(c, address, { message: SUCCESS_MESSAGES.ADDRESS_RETRIEVED });
   });
 
   app.post("/addresses", async (c) => {
@@ -1128,35 +1182,7 @@ export function createStorefrontRoutes() {
     const customerId = await requireCustomerId(c, sid);
     const { db, opened } = await useRequestDb(c);
     if (opened) scheduleDbClose(c, opened);
-
-    const created = await db.transaction(async (tx) => {
-      if (body.data.isDefault) {
-        await tx
-          .update(customerAddresses)
-          .set({ isDefault: false, updatedAt: new Date() })
-          .where(
-            and(eq(customerAddresses.storeId, sid), eq(customerAddresses.customerId, customerId)),
-          );
-      }
-      const [address] = await tx
-        .insert(customerAddresses)
-        .values({
-          storeId: sid,
-          customerId,
-          name: body.data.name,
-          phone: body.data.phone ?? null,
-          addressLine1: body.data.addressLine1,
-          addressLine2: body.data.addressLine2 ?? null,
-          city: body.data.city,
-          state: body.data.state ?? null,
-          postalCode: body.data.postalCode,
-          country: body.data.country,
-          isDefault: body.data.isDefault ?? false,
-        })
-        .returning();
-      return address;
-    });
-
+    const created = await insertCustomerAddress(db, sid, customerId, body.data);
     return sendSuccess(c, created, {
       message: SUCCESS_MESSAGES.ADDRESS_CREATED,
       status: HTTP_STATUS.CREATED,
@@ -1164,7 +1190,7 @@ export function createStorefrontRoutes() {
   });
 
   app.patch("/addresses/:addressId", async (c) => {
-    const body = addressBodySchema.partial().safeParse(await c.req.json());
+    const body = updateAddressBodySchema.safeParse(await c.req.json());
     if (!body.success) throw new ValidationError("Invalid address.", body.error.flatten());
     const sid = storeId(c);
     const customerId = await requireCustomerId(c, sid);
@@ -1214,17 +1240,8 @@ export function createStorefrontRoutes() {
     const customerId = await requireCustomerId(c, sid);
     const { db, opened } = await useRequestDb(c);
     if (opened) scheduleDbClose(c, opened);
-    const deleted = await db
-      .delete(customerAddresses)
-      .where(
-        and(
-          eq(customerAddresses.id, c.req.param("addressId")),
-          eq(customerAddresses.storeId, sid),
-          eq(customerAddresses.customerId, customerId),
-        ),
-      )
-      .returning({ id: customerAddresses.id });
-    if (!deleted.length) throw new NotFoundError("Address not found.");
+    const deleted = await deleteCustomerAddress(db, sid, customerId, c.req.param("addressId"));
+    if (!deleted) throw new NotFoundError("Address not found.");
     return sendSuccess(c, { deleted: true }, { message: SUCCESS_MESSAGES.ADDRESS_DELETED });
   });
 

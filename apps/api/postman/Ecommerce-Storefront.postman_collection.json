@@ -372,6 +372,34 @@
           }
         },
         {
+          "name": "Save Cart Shipping as Address",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json?.data?.id) pm.collectionVariables.set('address_id', json.data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "x-publishable-key", "value": "{{publishable_key}}" },
+              { "key": "Authorization", "value": "Bearer {{customer_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isDefault\": false\n}"
+            },
+            "url": "{{base_url}}/store/carts/{{cart_id}}/shipping-address/save",
+            "description": "Copies the cart shipping snapshot into the customer address book."
+          }
+        },
+        {
           "name": "Set Cart Email",
           "request": {
             "method": "POST",
@@ -444,7 +472,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"{{customer_email}}\",\n  \"password\": \"Customer@123\",\n  \"name\": \"Test Customer\"\n}"
+              "raw": "{\n  \"email\": \"{{customer_email}}\",\n  \"password\": \"Customer@123\",\n  \"name\": \"Test Customer\",\n  \"phone\": \"9999999999\"\n}"
             },
             "url": "{{base_url}}/store/auth/register",
             "description": "Use a unique email per run if the address already exists."
@@ -486,6 +514,23 @@
               { "key": "Authorization", "value": "Bearer {{customer_token}}" }
             ],
             "url": "{{base_url}}/store/auth/me"
+          }
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "x-publishable-key", "value": "{{publishable_key}}" },
+              { "key": "Authorization", "value": "Bearer {{customer_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Customer\",\n  \"phone\": \"9999999999\",\n  \"dateOfBirth\": \"1994-05-20\",\n  \"gender\": \"FEMALE\"\n}"
+            },
+            "url": "{{base_url}}/store/auth/me",
+            "description": "Email is read-only. Send any subset of name, phone, dateOfBirth, gender."
           }
         }
       ]
@@ -580,6 +625,17 @@
           }
         },
         {
+          "name": "Get Address",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "x-publishable-key", "value": "{{publishable_key}}" },
+              { "key": "Authorization", "value": "Bearer {{customer_token}}" }
+            ],
+            "url": "{{base_url}}/store/addresses/{{address_id}}"
+          }
+        },
+        {
           "name": "Create Address",
           "event": [
             {
@@ -620,6 +676,23 @@
               "raw": "{\n  \"addressLine1\": \"14 MG Road\",\n  \"isDefault\": true\n}"
             },
             "url": "{{base_url}}/store/addresses/{{address_id}}"
+          }
+        },
+        {
+          "name": "Set Default Address",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "x-publishable-key", "value": "{{publishable_key}}" },
+              { "key": "Authorization", "value": "Bearer {{customer_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isDefault\": true\n}"
+            },
+            "url": "{{base_url}}/store/addresses/{{address_id}}",
+            "description": "Marks this address as the default and clears default on the customer's other addresses."
           }
         },
         {

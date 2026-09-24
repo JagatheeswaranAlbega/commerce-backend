@@ -24,6 +24,8 @@ npm run db:seed
 
 Copy `.env.example` → `.env`. Requires `DATABASE_URL`, `JWT_SECRET`, seed passwords.
 
+Optional ZeptoMail (`ZEPTOMAIL_TOKEN`, `ZEPTOMAIL_FROM`): after storefront checkout the API sends an order-placed mail to `order.email`. Checkout still succeeds if mail is unset or the provider fails. For `wrangler dev`, copy the same keys into `.dev.vars`.
+
 Postman collections: [`postman/`](./postman/).
 
 ## Smoke checklist

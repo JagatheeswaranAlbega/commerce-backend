@@ -118,6 +118,37 @@ Important fields:
 - `slug`
 - timestamps
 
+### customers
+
+Purpose: storefront customer identities (per store).
+
+Important fields:
+
+- `id`
+- `store_id`
+- `email` (unique per store)
+- `name`
+- `phone`
+- `date_of_birth`
+- `gender` (`MALE` | `FEMALE` | `OTHER` | `PREFER_NOT_TO_SAY`)
+- `password_hash`
+- timestamps
+
+### customer_addresses
+
+Purpose: saved shipping addresses for a storefront customer.
+
+Important fields:
+
+- `id`
+- `store_id`
+- `customer_id`
+- recipient `name` / `phone`
+- `address_line_1` / `address_line_2`
+- `city` / `state` / `postal_code` / `country`
+- `is_default`
+- timestamps
+
 ### carts
 
 Important fields:

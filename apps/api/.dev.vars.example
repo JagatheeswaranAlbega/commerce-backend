@@ -2,3 +2,8 @@ ENVIRONMENT=development
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/ecommerce_multi_tenancy"
 JWT_SECRET=replace-with-a-development-secret-at-least-32-chars
 FRONTEND_URL=http://localhost:3000
+# Optional ZeptoMail (order-placed confirmation). Leave unset to skip.
+# ZEPTOMAIL_TOKEN=
+# ZEPTOMAIL_FROM=orders@yourdomain.com
+# ZEPTOMAIL_FROM_NAME=Orders
+# ZEPTOMAIL_API_URL=https://api.zeptomail.com/v1.1/email

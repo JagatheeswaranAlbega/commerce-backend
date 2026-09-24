@@ -1,12 +1,14 @@
 "use client"
 
 import Link from "next/link"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
+import { ConfirmDialog } from "@/components/admin/confirm-dialog"
+import { ProductStatusBadge } from "@/components/admin/products/product-status-badge"
 import { DataTable, type AppColumnDef } from "@/components/data-table"
-import { RowActionsMenu } from "@/components/row-actions-menu"
+import { RowActionsMenu, type RowActionsMenuItem } from "@/components/row-actions-menu"
 import { Button } from "@/components/ui/button"
 import { FieldError } from "@/components/ui/field"
 import { PermissionGate } from "@/components/admin/permission-gate"
@@ -18,7 +20,28 @@ import {
   removeAdminCollectionProduct,
   type AdminCollectionProduct,
 } from "@/lib/api/admin/collections"
-import { listAdminProducts } from "@/lib/api/admin/products"
+import {
+  listAdminProducts,
+  updateAdminProduct,
+  type ProductStatus,
+} from "@/lib/api/admin/products"
+
+const PRODUCT_STATUSES: ProductStatus[] = ["DRAFT", "ACTIVE", "ARCHIVED"]
+
+function isProductStatus(value: string): value is ProductStatus {
+  return PRODUCT_STATUSES.includes(value as ProductStatus)
+}
+
+function statusChangeItems(status: ProductStatus): {
+  label: string
+  status: ProductStatus
+}[] {
+  const items: { label: string; status: ProductStatus }[] = []
+  if (status !== "ACTIVE") items.push({ label: "Publish", status: "ACTIVE" })
+  if (status !== "DRAFT") items.push({ label: "Move to draft", status: "DRAFT" })
+  if (status !== "ARCHIVED") items.push({ label: "Archive", status: "ARCHIVED" })
+  return items
+}
 
 export default function AdminCollectionDetailPage() {
   return (
@@ -31,9 +54,12 @@ export default function AdminCollectionDetailPage() {
 function CollectionDetailPageContent() {
   const params = useParams<{ id: string }>()
   const collectionId = params.id
+  const router = useRouter()
   const queryClient = useQueryClient()
   const [productId, setProductId] = useState("")
   const [error, setError] = useState<string | null>(null)
+  const [pendingArchive, setPendingArchive] =
+    useState<AdminCollectionProduct | null>(null)
 
   const collectionsQuery = useQuery({
     queryKey: ["admin", "collections"],
@@ -79,6 +105,38 @@ function CollectionDetailPageContent() {
         queryKey: ["admin", "collections", collectionId, "products"],
       })
     },
+    onError: (cause) => {
+      setError(
+        cause instanceof ApiError ? cause.message : "Failed to remove product."
+      )
+    },
+  })
+
+  const statusMutation = useMutation({
+    mutationFn: ({
+      id,
+      status,
+    }: {
+      id: string
+      status: ProductStatus
+    }) => updateAdminProduct(id, { status }),
+    onSuccess: async () => {
+      setPendingArchive(null)
+      setError(null)
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["admin", "collections", collectionId, "products"],
+        }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "products"] }),
+      ])
+    },
+    onError: (cause) => {
+      setError(
+        cause instanceof ApiError
+          ? cause.message
+          : "Failed to update product status."
+      )
+    },
   })
 
   const columns = useMemo<AppColumnDef<AdminCollectionProduct>[]>(
@@ -96,26 +154,57 @@ function CollectionDetailPageContent() {
         ),
       },
       { accessorKey: "handle", header: "Handle" },
-      { accessorKey: "status", header: "Status" },
+      {
+        accessorKey: "status",
+        header: "Status",
+        cell: ({ row }) => {
+          const status = isProductStatus(row.original.status)
+            ? row.original.status
+            : "DRAFT"
+          return <ProductStatusBadge status={status} />
+        },
+      },
       {
         id: "actions",
         header: "",
-        cell: ({ row }) => (
-          <RowActionsMenu
-            label="Product actions"
-            items={[
-              {
-                label: "Remove",
-                variant: "destructive",
-                disabled: removeMutation.isPending,
-                onClick: () => removeMutation.mutate(row.original.id),
+        enableSorting: false,
+        cell: ({ row }) => {
+          const product = row.original
+          const status = isProductStatus(product.status)
+            ? product.status
+            : "DRAFT"
+          const busy = removeMutation.isPending || statusMutation.isPending
+          const items: RowActionsMenuItem[] = [
+            {
+              label: "Edit",
+              onClick: () => router.push(`/admin/products/${product.id}`),
+            },
+            ...statusChangeItems(status).map((action) => ({
+              label: action.label,
+              disabled: busy,
+              onClick: () => {
+                if (action.status === "ARCHIVED") {
+                  setPendingArchive(product)
+                  return
+                }
+                statusMutation.mutate({
+                  id: product.id,
+                  status: action.status,
+                })
               },
-            ]}
-          />
-        ),
+            })),
+            {
+              label: "Remove",
+              variant: "destructive",
+              disabled: busy,
+              onClick: () => removeMutation.mutate(product.id),
+            },
+          ]
+          return <RowActionsMenu label="Product actions" items={items} />
+        },
       },
     ],
-    [removeMutation]
+    [removeMutation.isPending, router, statusMutation]
   )
 
   return (
@@ -180,6 +269,29 @@ function CollectionDetailPageContent() {
           emptyMessage="No products in this collection."
         />
       )}
+
+      <ConfirmDialog
+        open={pendingArchive !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingArchive(null)
+        }}
+        title="Archive product?"
+        description={
+          pendingArchive
+            ? `${pendingArchive.title} will be hidden from the storefront. You can publish it again later.`
+            : "This product will be hidden from the storefront."
+        }
+        confirmLabel="Archive"
+        variant="warning"
+        pending={statusMutation.isPending}
+        onConfirm={() => {
+          if (!pendingArchive) return
+          statusMutation.mutate({
+            id: pendingArchive.id,
+            status: "ARCHIVED",
+          })
+        }}
+      />
     </div>
   )
 }

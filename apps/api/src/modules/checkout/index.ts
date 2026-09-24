@@ -10,3 +10,9 @@ export {
   type ShippingSettings,
   type TaxSettings,
 } from "./totals";
+export {
+  buildOrderPlacedEmail,
+  formatInrPaise,
+  notifyOrderPlaced,
+  zeptoMailConfigFromEnv,
+} from "./order-placed-email";
