@@ -8,8 +8,18 @@ import type {
   GlobalProductStatus,
 } from "@/lib/api/platform/global-catalog"
 
+export type ImportStoreCategoryAssignment =
+  | { storeCategoryId: string; newCategory?: undefined }
+  | { storeCategoryId?: undefined; newCategory: { name: string; slug: string } }
+
+export type ImportedGlobalProduct = GlobalProduct & {
+  associationId: string
+  importedAt: string
+  storeCategoryId: string | null
+}
+
 export type BulkImportGlobalProductsResult = {
-  imported: Array<GlobalProduct & { associationId: string; importedAt: string }>
+  imported: ImportedGlobalProduct[]
   failed: Array<{ productId: string; message: string; code: string | null }>
   importedCount: number
   failedCount: number
@@ -44,23 +54,44 @@ export async function getAdminGlobalProduct(productId: string) {
   })
 }
 
-export async function importAdminGlobalProduct(productId: string) {
-  return apiFetch<GlobalProduct & { associationId: string; importedAt: string }>(
+export async function importAdminGlobalProduct(
+  productId: string,
+  assignment: ImportStoreCategoryAssignment
+) {
+  return apiFetch<ImportedGlobalProduct>(
     `/admin/global-catalog/products/${productId}/import`,
     {
       method: "POST",
       auth: "session",
+      body: JSON.stringify(assignment),
     }
   )
 }
 
-export async function importAdminGlobalProducts(productIds: string[]) {
+export async function importAdminGlobalProducts(
+  productIds: string[],
+  assignment: ImportStoreCategoryAssignment
+) {
   return apiFetch<BulkImportGlobalProductsResult>(`/admin/global-catalog/products/import`, {
     method: "POST",
     auth: "session",
     silent: true,
-    body: JSON.stringify({ productIds }),
+    body: JSON.stringify({ productIds, ...assignment }),
   })
+}
+
+export async function remapAdminGlobalProductCategory(
+  productId: string,
+  assignment: ImportStoreCategoryAssignment
+) {
+  return apiFetch<ImportedGlobalProduct>(
+    `/admin/global-catalog/products/${productId}/import`,
+    {
+      method: "PATCH",
+      auth: "session",
+      body: JSON.stringify(assignment),
+    }
+  )
 }
 
 export async function removeAdminGlobalProductImport(productId: string) {

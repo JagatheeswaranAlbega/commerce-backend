@@ -1,5 +1,14 @@
 /** Development catalog for Alora Fashion (Indian women's ethnic wear). */
 
+export const ALORA_WOMEN_CATEGORIES = [
+  { name: "Sarees", slug: "sarees" as const },
+  { name: "Lehengas", slug: "lehengas" as const },
+  { name: "Kurtas", slug: "kurtas" as const },
+  { name: "Suits & Sets", slug: "suits-and-sets" as const },
+] as const;
+
+export type AloraCategorySlug = (typeof ALORA_WOMEN_CATEGORIES)[number]["slug"];
+
 export type AloraCatalogProduct = {
   handle: string;
   title: string;
@@ -10,16 +19,13 @@ export type AloraCatalogProduct = {
   sku: string;
   variantTitle: string;
   initialQuantity: number;
+  categorySlug: AloraCategorySlug;
 };
-
-export const ALORA_WOMEN_CATEGORY = {
-  name: "Women's Ethnic Wear",
-  slug: "womens-ethnic-wear",
-} as const;
 
 export const ALORA_WOMEN_PRODUCTS: readonly AloraCatalogProduct[] = [
   {
     handle: "emerald-kanjeevaram-saree",
+    categorySlug: "sarees",
     title: "Emerald Kanjeevaram Silk Saree",
     shortDescription: "Handloom Kanjeevaram silk in deep emerald with gold temple border.",
     description:
@@ -32,6 +38,7 @@ export const ALORA_WOMEN_PRODUCTS: readonly AloraCatalogProduct[] = [
   },
   {
     handle: "ivory-chanderi-suit-set",
+    categorySlug: "suits-and-sets",
     title: "Ivory Chanderi Silk Suit Set",
     shortDescription: "Lightweight ivory Chanderi kurta, pant, and dupatta set.",
     description:
@@ -44,6 +51,7 @@ export const ALORA_WOMEN_PRODUCTS: readonly AloraCatalogProduct[] = [
   },
   {
     handle: "rose-chikankari-kurta-set",
+    categorySlug: "kurtas",
     title: "Rose Pink Chikankari Kurta Set",
     shortDescription: "Lucknowi chikankari on soft rose mulmul cotton.",
     description:
@@ -56,6 +64,7 @@ export const ALORA_WOMEN_PRODUCTS: readonly AloraCatalogProduct[] = [
   },
   {
     handle: "midnight-anarkali-dupatta",
+    categorySlug: "suits-and-sets",
     title: "Midnight Blue Anarkali with Dupatta",
     shortDescription: "Flared georgette Anarkali in midnight blue with silver work.",
     description:
@@ -68,6 +77,7 @@ export const ALORA_WOMEN_PRODUCTS: readonly AloraCatalogProduct[] = [
   },
   {
     handle: "mustard-bandhani-lehenga",
+    categorySlug: "lehengas",
     title: "Mustard Bandhani Lehenga Set",
     shortDescription: "Rajasthani mustard bandhani lehenga with mirror work.",
     description:
@@ -80,6 +90,7 @@ export const ALORA_WOMEN_PRODUCTS: readonly AloraCatalogProduct[] = [
   },
   {
     handle: "teal-organza-sharara",
+    categorySlug: "suits-and-sets",
     title: "Teal Organza Sharara Set",
     shortDescription: "Sheer teal organza kurta with flared sharara pants.",
     description:
@@ -92,6 +103,7 @@ export const ALORA_WOMEN_PRODUCTS: readonly AloraCatalogProduct[] = [
   },
   {
     handle: "coral-cotton-kurti",
+    categorySlug: "kurtas",
     title: "Coral Floral Cotton Kurti",
     shortDescription: "Everyday coral printed cotton A-line kurti.",
     description:
@@ -104,6 +116,7 @@ export const ALORA_WOMEN_PRODUCTS: readonly AloraCatalogProduct[] = [
   },
   {
     handle: "black-embroidered-coord",
+    categorySlug: "suits-and-sets",
     title: "Black Embroidered Palazzo Co-ord",
     shortDescription: "Black cotton co-ord with tonal thread embroidery.",
     description:
@@ -116,6 +129,7 @@ export const ALORA_WOMEN_PRODUCTS: readonly AloraCatalogProduct[] = [
   },
   {
     handle: "gold-tissue-silk-saree",
+    categorySlug: "sarees",
     title: "Gold Tissue Silk Saree",
     shortDescription: "Shimmering gold tissue silk with fine zari border.",
     description:
@@ -128,6 +142,7 @@ export const ALORA_WOMEN_PRODUCTS: readonly AloraCatalogProduct[] = [
   },
   {
     handle: "mint-linen-kurta",
+    categorySlug: "kurtas",
     title: "Mint Handloom Linen Kurta",
     shortDescription: "Breathable mint linen kurta with mandarin collar.",
     description:
@@ -140,6 +155,7 @@ export const ALORA_WOMEN_PRODUCTS: readonly AloraCatalogProduct[] = [
   },
   {
     handle: "wine-velvet-festive-suit",
+    categorySlug: "suits-and-sets",
     title: "Wine Velvet Festive Suit",
     shortDescription: "Winter festive wine velvet kurta with zari motifs.",
     description:
@@ -152,6 +168,7 @@ export const ALORA_WOMEN_PRODUCTS: readonly AloraCatalogProduct[] = [
   },
   {
     handle: "indigo-dabu-print-dress",
+    categorySlug: "suits-and-sets",
     title: "Indigo Dabu Print Maxi Dress",
     shortDescription: "Rajasthani indigo dabu block-print cotton maxi.",
     description:
@@ -164,6 +181,7 @@ export const ALORA_WOMEN_PRODUCTS: readonly AloraCatalogProduct[] = [
   },
   {
     handle: "peach-georgette-salwar",
+    categorySlug: "suits-and-sets",
     title: "Peach Georgette Salwar Suit",
     shortDescription: "Soft peach georgette suit with sequin spray.",
     description:
@@ -176,6 +194,7 @@ export const ALORA_WOMEN_PRODUCTS: readonly AloraCatalogProduct[] = [
   },
   {
     handle: "ivory-pearl-lehenga",
+    categorySlug: "lehengas",
     title: "Ivory Pearl Embellished Lehenga",
     shortDescription: "Ivory net lehenga with pearl and crystal work.",
     description:
@@ -188,6 +207,7 @@ export const ALORA_WOMEN_PRODUCTS: readonly AloraCatalogProduct[] = [
   },
   {
     handle: "rust-handloom-saree",
+    categorySlug: "sarees",
     title: "Rust Orange Handloom Cotton Saree",
     shortDescription: "Everyday handloom cotton saree in rust orange.",
     description:
@@ -200,6 +220,7 @@ export const ALORA_WOMEN_PRODUCTS: readonly AloraCatalogProduct[] = [
   },
   {
     handle: "lavender-sequin-gown",
+    categorySlug: "suits-and-sets",
     title: "Lavender Sequin Party Gown",
     shortDescription: "Floor-length lavender sequin gown for cocktail nights.",
     description:
@@ -212,6 +233,7 @@ export const ALORA_WOMEN_PRODUCTS: readonly AloraCatalogProduct[] = [
   },
   {
     handle: "cream-kasavu-saree",
+    categorySlug: "sarees",
     title: "Cream Kerala Kasavu Saree",
     shortDescription: "Traditional Onam kasavu with golden border.",
     description:
@@ -224,6 +246,7 @@ export const ALORA_WOMEN_PRODUCTS: readonly AloraCatalogProduct[] = [
   },
   {
     handle: "red-bridal-banarasi-lehenga",
+    categorySlug: "lehengas",
     title: "Red Bridal Banarasi Lehenga",
     shortDescription: "Bridal red Banarasi silk lehenga with heavy zari.",
     description:
@@ -236,6 +259,7 @@ export const ALORA_WOMEN_PRODUCTS: readonly AloraCatalogProduct[] = [
   },
   {
     handle: "olive-straight-kurta-set",
+    categorySlug: "kurtas",
     title: "Olive Cotton Straight Kurta Set",
     shortDescription: "Olive cotton straight kurta with pants and stole.",
     description:
@@ -248,6 +272,7 @@ export const ALORA_WOMEN_PRODUCTS: readonly AloraCatalogProduct[] = [
   },
   {
     handle: "fuchsia-pre-draped-saree",
+    categorySlug: "sarees",
     title: "Fuchsia Pre-Draped Georgette Saree",
     shortDescription: "Ready-to-wear fuchsia georgette saree with belt.",
     description:

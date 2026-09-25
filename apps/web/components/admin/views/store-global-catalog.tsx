@@ -19,14 +19,21 @@ import { ListPagination } from "@/components/list-pagination"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
+import { ImportCategoryDialog } from "@/components/admin/global-catalog/import-category-dialog"
 import {
   importAdminGlobalProducts,
   listAdminGlobalCategories,
   listAdminGlobalProducts,
+  type ImportStoreCategoryAssignment,
 } from "@/lib/api/admin/global-catalog"
 import type { GlobalProduct, GlobalProductStatus } from "@/lib/api/platform/global-catalog"
 import { ADMIN_TABLE_PAGE_SIZE } from "@/lib/admin-table"
 import { formatDate } from "@/lib/format"
+import {
+  globalCategoryById,
+  globalCategoryLabel,
+  globalCategorySelectOptions,
+} from "@/lib/global-category-label"
 import { appToast } from "@/lib/toast"
 import { cn } from "cn"
 
@@ -78,6 +85,7 @@ export function StoreGlobalCatalog() {
   const [categoryFilter, setCategoryFilter] = useState("ALL")
   const [search, setSearch] = useState("")
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
+  const [importOpen, setImportOpen] = useState(false)
   const debouncedSearch = useDebouncedValue(search.trim(), 300)
 
   const categoriesQuery = useQuery({
@@ -126,12 +134,20 @@ export function StoreGlobalCatalog() {
     selectedOnPageCount > 0 && selectedOnPageCount < importableOnPage.length
 
   const importMutation = useMutation({
-    mutationFn: (productIds: string[]) => importAdminGlobalProducts(productIds),
+    mutationFn: ({
+      productIds,
+      assignment,
+    }: {
+      productIds: string[]
+      assignment: ImportStoreCategoryAssignment
+    }) => importAdminGlobalProducts(productIds, assignment),
     onSuccess: async (result) => {
       setSelectedIds(new Set())
+      setImportOpen(false)
       await queryClient.invalidateQueries({ queryKey: ["admin", "global-products"] })
       await queryClient.invalidateQueries({ queryKey: ["admin", "inventory"] })
       await queryClient.invalidateQueries({ queryKey: ["admin", "products"] })
+      await queryClient.invalidateQueries({ queryKey: ["admin", "categories"] })
 
       if (result.failedCount === 0) {
         appToast.success(
@@ -174,13 +190,22 @@ export function StoreGlobalCatalog() {
     })
   }
 
-  const categoryById = useMemo(() => {
-    const map = new Map<string, string>()
-    for (const category of categoriesQuery.data ?? []) {
-      map.set(category.id, category.name)
-    }
-    return map
-  }, [categoriesQuery.data])
+  const categories = categoriesQuery.data ?? []
+  const categoryById = useMemo(() => globalCategoryById(categories), [categories])
+  const categoryOptions = useMemo(
+    () => globalCategorySelectOptions(categories),
+    [categories]
+  )
+
+  const suggestedCategory = useMemo(() => {
+    const selected = products.filter((product) => selectedIds.has(product.id))
+    const firstId = selected[0]?.categoryId
+    if (!firstId) return { name: "", slug: "" }
+    const same = selected.every((product) => product.categoryId === firstId)
+    if (!same) return { name: "", slug: "" }
+    const category = categoryById.get(firstId)
+    return { name: category?.name ?? "", slug: category?.slug ?? "" }
+  }, [categoryById, products, selectedIds])
 
   const columns = useMemo<AppColumnDef<GlobalProduct>[]>(
     () => [
@@ -242,7 +267,10 @@ export function StoreGlobalCatalog() {
         header: "Category",
         cell: ({ row }) =>
           row.original.categoryId
-            ? (categoryById.get(row.original.categoryId) ?? "—")
+            ? (() => {
+                const category = categoryById.get(row.original.categoryId)
+                return category ? globalCategoryLabel(category, categoryById) : "—"
+              })()
             : "—",
       },
       {
@@ -300,7 +328,7 @@ export function StoreGlobalCatalog() {
               <Button
                 size="sm"
                 disabled={importMutation.isPending}
-                onClick={() => importMutation.mutate([...selectedIds])}
+                onClick={() => setImportOpen(true)}
               >
                 {importMutation.isPending
                   ? "Importing…"
@@ -375,10 +403,7 @@ export function StoreGlobalCatalog() {
           }}
           options={[
             { value: "ALL", label: "All categories" },
-            ...(categoriesQuery.data ?? []).map((category) => ({
-              value: category.id,
-              label: category.name,
-            })),
+            ...categoryOptions,
           ]}
         />
       </AdminFilterBar>
@@ -400,6 +425,26 @@ export function StoreGlobalCatalog() {
           />
         </>
       )}
+
+      <ImportCategoryDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        title={
+          selectedCount === 1
+            ? "Import product"
+            : `Import ${selectedCount} products`
+        }
+        description="Assign these products to an existing store category or create a new one so they appear in your shop."
+        confirmLabel={
+          selectedCount === 1 ? "Import product" : `Import ${selectedCount} products`
+        }
+        pending={importMutation.isPending}
+        defaultCategoryName={suggestedCategory.name}
+        defaultCategorySlug={suggestedCategory.slug}
+        onConfirm={(assignment) =>
+          importMutation.mutate({ productIds: [...selectedIds], assignment })
+        }
+      />
     </div>
   )
 }

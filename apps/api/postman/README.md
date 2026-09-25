@@ -18,7 +18,7 @@ The storefront header must be a **single line**: `pk_live_` plus hex. Do not pas
 Copy `data.rawKey` from Platform **Create Key**, or `data.keys.publishableKey` from **Create Store**. **List Keys** only returns `keyPrefix` (e.g. `pk_live_00161409…`) — that partial value will not authenticate.
 
 Seed defaults in the envs:
-- Alora (`Store-A`): product `emerald-kanjeevaram-saree`, category `womens-ethnic-wear`
+- Alora (`Store-A`): product `emerald-kanjeevaram-saree`, category `sarees`
 - Zentrix (`Store-B`): product `ivory-soft-cotton-romper`, category `baby-boys`
 
 `SAVE10` is not seeded — create an ACTIVE discount in Store Admin before Apply Discount / checkout with a code.

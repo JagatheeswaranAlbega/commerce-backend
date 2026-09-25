@@ -148,3 +148,28 @@
     @apply flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground;
   }
 }
+
+/* Boutique storefront (Bafoa-inspired) */
+.shop-theme {
+  --background: oklch(0.99 0.008 85);
+  --foreground: oklch(0.24 0.03 30);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.24 0.03 30);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.24 0.03 30);
+  --primary: oklch(0.36 0.11 18);
+  --primary-foreground: oklch(0.99 0.01 85);
+  --secondary: oklch(0.95 0.012 80);
+  --secondary-foreground: oklch(0.28 0.03 30);
+  --muted: oklch(0.95 0.01 80);
+  --muted-foreground: oklch(0.48 0.03 40);
+  --accent: oklch(0.94 0.015 80);
+  --accent-foreground: oklch(0.28 0.03 30);
+  --border: oklch(0.9 0.015 75);
+  --input: oklch(0.9 0.015 75);
+  --ring: oklch(0.42 0.1 18);
+  --font-heading: var(--font-shop-serif), ui-serif, Georgia, serif;
+  color-scheme: light;
+  background-color: var(--background);
+  color: var(--foreground);
+}

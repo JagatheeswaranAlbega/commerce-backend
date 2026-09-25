@@ -53,11 +53,20 @@ export type StoreGlobalProductRecord = {
   id: string;
   storeId: string;
   globalProductId: string;
+  storeCategoryId: string | null;
   status: CategoryStatus;
   importedAt: Date;
   createdAt: Date;
   updatedAt: Date;
 };
+
+export type ImportedGlobalProductRecord = GlobalProductRecord & {
+  storeCategoryId: string | null;
+};
+
+export type ImportStoreCategoryAssignment =
+  | { storeCategoryId: string; newCategory?: undefined }
+  | { storeCategoryId?: undefined; newCategory: { name: string; slug: string } };
 
 export type GlobalCategoryResponse = {
   id: string;
@@ -78,6 +87,7 @@ export type GlobalProductThumbnail = {
 export type GlobalProductResponse = {
   id: string;
   categoryId: string | null;
+  storeCategoryId?: string | null;
   title: string;
   handle: string;
   shortDescription: string | null;
@@ -190,6 +200,7 @@ export function toGlobalProductResponse(
     imported?: boolean;
     importCount?: number;
     thumbnail?: GlobalProductThumbnail | null;
+    storeCategoryId?: string | null;
   },
 ): GlobalProductResponse {
   return {
@@ -206,6 +217,7 @@ export function toGlobalProductResponse(
     ...(extras?.imported !== undefined ? { imported: extras.imported } : {}),
     ...(extras?.importCount !== undefined ? { importCount: extras.importCount } : {}),
     ...(extras?.thumbnail !== undefined ? { thumbnail: extras.thumbnail } : {}),
+    ...(extras?.storeCategoryId !== undefined ? { storeCategoryId: extras.storeCategoryId } : {}),
   };
 }
 

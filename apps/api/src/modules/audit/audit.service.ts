@@ -21,6 +21,7 @@ export const AUDIT_ACTIONS = {
   PRODUCT_UPDATE: "product.update",
   PRODUCT_DELETE: "product.delete",
   GLOBAL_PRODUCT_IMPORT: "global_product.import",
+  GLOBAL_PRODUCT_CATEGORY_UPDATE: "global_product.category_update",
   GLOBAL_PRODUCT_REMOVE: "global_product.remove",
   GLOBAL_PRODUCT_CREATE: "global_product.create",
   GLOBAL_PRODUCT_DELETE: "global_product.delete",

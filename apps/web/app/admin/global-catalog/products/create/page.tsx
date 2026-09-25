@@ -41,6 +41,11 @@ import {
   type GlobalVariant,
 } from "@/lib/api/platform/global-catalog"
 import { slugify } from "@/lib/format"
+import {
+  globalCategoryById,
+  globalCategorySelectOptions,
+  topLevelCategoryId,
+} from "@/lib/global-category-label"
 import { formatPaise } from "@/lib/money"
 import { paiseToRupeesInput, rupeesToPaise } from "@/lib/money-input"
 
@@ -624,6 +629,9 @@ function CreateGlobalProductPageContent() {
     publishMutation.isPending
 
   const categories = categoriesQuery.data ?? []
+  const categoryById = globalCategoryById(categories)
+  const categoryOptions = globalCategorySelectOptions(categories)
+  const selectedCategoryId = topLevelCategoryId(categoryId, categoryById)
   const variants = productQuery.data?.variants ?? []
   const images = productQuery.data?.images ?? []
   const checklist = {
@@ -745,14 +753,14 @@ function CreateGlobalProductPageContent() {
                 <select
                   id="categoryId"
                   className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-                  value={categoryId}
+                  value={selectedCategoryId}
                   onChange={(e) => setCategoryId(e.target.value)}
                   disabled={isPending}
                 >
                   <option value="">None</option>
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
+                  {categoryOptions.map((category) => (
+                    <option key={category.value} value={category.value}>
+                      {category.label}
                     </option>
                   ))}
                 </select>

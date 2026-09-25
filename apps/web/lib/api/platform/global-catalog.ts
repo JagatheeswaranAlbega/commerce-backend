@@ -16,6 +16,7 @@ export type GlobalCategory = {
 export type GlobalProduct = {
   id: string
   categoryId: string | null
+  storeCategoryId?: string | null
   title: string
   handle: string
   shortDescription: string | null

@@ -52,6 +52,10 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL(target, request.url))
   }
 
+  if (pathname === "/shop" || pathname.startsWith("/shop/")) {
+    return NextResponse.next()
+  }
+
   if (pathname === "/platform" || pathname.startsWith("/platform/")) {
     const target = platformToAdminPath(pathname)
     const url = request.nextUrl.clone()

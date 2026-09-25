@@ -46,6 +46,7 @@ export const SUCCESS_MESSAGES = {
   GLOBAL_PRODUCT_IMPORTED: "Global product imported into your store",
   GLOBAL_PRODUCTS_IMPORTED: "Selected global products imported into your store",
   GLOBAL_PRODUCTS_IMPORT_NONE: "No products were imported",
+  GLOBAL_PRODUCT_CATEGORY_UPDATED: "Imported product category updated",
   GLOBAL_PRODUCT_REMOVED: "Global product removed from your store",
 
   // Collections

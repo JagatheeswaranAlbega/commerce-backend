@@ -103,6 +103,7 @@ export const categoriesRelations = relations(categories, ({ one, many }) => ({
   }),
   children: many(categories, { relationName: "category_parent" }),
   products: many(products),
+  storeGlobalProducts: many(storeGlobalProducts),
 }));
 
 export const globalCategoriesRelations = relations(globalCategories, ({ one, many }) => ({
@@ -184,6 +185,10 @@ export const storeGlobalProductsRelations = relations(storeGlobalProducts, ({ on
   globalProduct: one(globalProducts, {
     fields: [storeGlobalProducts.globalProductId],
     references: [globalProducts.id],
+  }),
+  storeCategory: one(categories, {
+    fields: [storeGlobalProducts.storeCategoryId],
+    references: [categories.id],
   }),
 }));
 

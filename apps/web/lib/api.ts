@@ -39,7 +39,11 @@ export class ApiError extends Error {
   }
 }
 
-export type ApiAuthMode = "session" | "none"
+export type ApiAuthMode = "session" | "none" | "publishable"
+
+export function getStorefrontPublishableKey(): string {
+  return process.env.NEXT_PUBLIC_STOREFRONT_PUBLISHABLE_KEY?.trim() ?? ""
+}
 
 export type ApiFetchOptions = RequestInit & {
   auth?: ApiAuthMode
@@ -115,6 +119,13 @@ function buildHeaders(init: RequestInit, auth: ApiAuthMode): Headers {
     const token = getAccessToken()
     if (token) {
       headers.set("Authorization", `Bearer ${token}`)
+    }
+  }
+
+  if (auth === "publishable") {
+    const key = getStorefrontPublishableKey()
+    if (key) {
+      headers.set("x-publishable-key", key)
     }
   }
 

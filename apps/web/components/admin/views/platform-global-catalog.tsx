@@ -24,10 +24,12 @@ import { Badge } from "@/components/ui/badge"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { cn } from "cn"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
@@ -43,6 +45,12 @@ import {
 } from "@/lib/api/platform/global-catalog"
 import { ADMIN_TABLE_PAGE_SIZE } from "@/lib/admin-table"
 import { formatDate, slugify } from "@/lib/format"
+import {
+  globalCategoryById,
+  globalCategoryLabel,
+  globalCategorySelectOptions,
+  sortGlobalCategories,
+} from "@/lib/global-category-label"
 
 export function PlatformGlobalCatalog() {
   const router = useRouter()
@@ -58,6 +66,7 @@ export function PlatformGlobalCatalog() {
     useState<GlobalCategory | null>(null)
   const [categoryName, setCategoryName] = useState("")
   const [categorySlug, setCategorySlug] = useState("")
+  const [categoryParentId, setCategoryParentId] = useState("")
 
   const categoriesQuery = useQuery({
     queryKey: ["platform", "global-categories"],
@@ -96,6 +105,7 @@ export function PlatformGlobalCatalog() {
     onSuccess: async () => {
       setCategoryName("")
       setCategorySlug("")
+      setCategoryParentId("")
       await queryClient.invalidateQueries({ queryKey: ["platform", "global-categories"] })
     },
   })
@@ -113,13 +123,16 @@ export function PlatformGlobalCatalog() {
     },
   })
 
-  const categoryById = useMemo(() => {
-    const map = new Map<string, GlobalCategory>()
-    for (const category of categoriesQuery.data ?? []) {
-      map.set(category.id, category)
-    }
-    return map
-  }, [categoriesQuery.data])
+  const categories = categoriesQuery.data ?? []
+  const categoryById = useMemo(() => globalCategoryById(categories), [categories])
+  const categoryOptions = useMemo(
+    () => globalCategorySelectOptions(categories),
+    [categories]
+  )
+  const orderedCategories = useMemo(
+    () => sortGlobalCategories(categories),
+    [categories]
+  )
 
   const columns = useMemo<AppColumnDef<GlobalProduct>[]>(
     () => [
@@ -150,10 +163,12 @@ export function PlatformGlobalCatalog() {
       {
         id: "category",
         header: "Category",
-        cell: ({ row }) =>
-          row.original.categoryId
-            ? (categoryById.get(row.original.categoryId)?.name ?? "—")
-            : "—",
+        cell: ({ row }) => {
+          const category = row.original.categoryId
+            ? categoryById.get(row.original.categoryId)
+            : undefined
+          return category ? globalCategoryLabel(category, categoryById) : "—"
+        },
       },
       {
         accessorKey: "status",
@@ -267,10 +282,7 @@ export function PlatformGlobalCatalog() {
           }}
           options={[
             { value: "ALL", label: "All categories" },
-            ...(categoriesQuery.data ?? []).map((category) => ({
-              value: category.id,
-              label: category.name,
-            })),
+            ...categoryOptions,
           ]}
         />
       </AdminFilterBar>
@@ -318,30 +330,42 @@ export function PlatformGlobalCatalog() {
           if (!open) {
             setCategoryName("")
             setCategorySlug("")
+            setCategoryParentId("")
           }
         }}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="flex max-h-[min(40rem,calc(100vh-2rem))] w-[calc(100vw-2rem)] max-w-lg flex-col gap-4 overflow-hidden">
           <DialogHeader>
             <DialogTitle>Global categories</DialogTitle>
+            <DialogDescription>
+              Top-level categories appear in product filters. Child categories stay
+              nested under a parent.
+            </DialogDescription>
           </DialogHeader>
 
-          <div className="overflow-hidden rounded-lg border">
-            {(categoriesQuery.data?.length ?? 0) === 0 ? (
+          <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border">
+            {orderedCategories.length === 0 ? (
               <p className="px-3 py-6 text-center text-sm text-muted-foreground">
                 No categories yet.
               </p>
             ) : (
               <ul className="divide-y">
-                {(categoriesQuery.data ?? []).map((category) => (
+                {orderedCategories.map((category) => (
                   <li
                     key={category.id}
-                    className="flex items-center justify-between gap-3 px-3 py-2.5"
+                    className={cn(
+                      "flex items-center justify-between gap-3 py-2.5 pr-3",
+                      category.parentId ? "bg-muted/30 pl-8" : "pl-3"
+                    )}
                   >
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{category.name}</p>
+                      <p className="truncate text-sm font-medium">
+                        {category.name}
+                      </p>
                       <p className="truncate text-xs text-muted-foreground">
-                        /{category.slug}
+                        {category.parentId
+                          ? `${categoryById.get(category.parentId)?.name ?? "Parent"} · /${category.slug}`
+                          : `/${category.slug}`}
                       </p>
                     </div>
                     <Button
@@ -361,7 +385,7 @@ export function PlatformGlobalCatalog() {
             )}
           </div>
 
-          <FieldGroup>
+          <FieldGroup className="shrink-0">
             <Field>
               <FieldLabel>Name</FieldLabel>
               <Input
@@ -378,12 +402,27 @@ export function PlatformGlobalCatalog() {
               <Input
                 value={categorySlug}
                 onChange={(e) => setCategorySlug(e.target.value)}
-                placeholder="e.g. perfumes"
+                placeholder="e.g. rings"
               />
+            </Field>
+            <Field>
+              <FieldLabel>Parent</FieldLabel>
+              <select
+                className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                value={categoryParentId}
+                onChange={(e) => setCategoryParentId(e.target.value)}
+              >
+                <option value="">None — top level</option>
+                {categoryOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </Field>
           </FieldGroup>
 
-          <DialogFooter>
+          <DialogFooter className="shrink-0">
             <Button variant="outline" onClick={() => setManageCategoriesOpen(false)}>
               Done
             </Button>
@@ -397,6 +436,7 @@ export function PlatformGlobalCatalog() {
                 createCategoryMutation.mutate({
                   name: categoryName.trim(),
                   slug: categorySlug.trim(),
+                  parentId: categoryParentId || null,
                 })
               }
             >

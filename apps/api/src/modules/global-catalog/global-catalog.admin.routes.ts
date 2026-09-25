@@ -4,8 +4,11 @@ import { AUDIT_ACTIONS, actorFromAuth, writeAuditLog } from "@/modules/audit";
 import {
   bulkImportGlobalProductsBodySchema,
   GlobalCatalogService,
+  importGlobalProductBodySchema,
   listGlobalCategoriesQuerySchema,
   listGlobalProductsQuerySchema,
+  remapImportedProductBodySchema,
+  toImportAssignment,
 } from "@/modules/global-catalog";
 import { HTTP_STATUS } from "@/shared/constants/http";
 import { SUCCESS_MESSAGES } from "@/shared/constants/success-messages";
@@ -65,6 +68,7 @@ export function registerAdminGlobalCatalogRoutes(app: Hono<AppEnv>) {
     const result = await new GlobalCatalogService(db).importManyToStore(
       storeId,
       parsed.data.productIds,
+      toImportAssignment(parsed.data),
     );
 
     const actor = actorFromAuth(c.get("auth"));
@@ -103,11 +107,19 @@ export function registerAdminGlobalCatalogRoutes(app: Hono<AppEnv>) {
   });
 
   app.post("/global-catalog/products/:productId/import", async (c) => {
+    const body = await c.req.json().catch(() => null);
+    const parsed = importGlobalProductBodySchema.safeParse(body);
+    if (!parsed.success) throw new ValidationError("Invalid body.", parsed.error.flatten());
+
     const { db, opened } = await useRequestDb(c);
     if (opened) scheduleDbClose(c, opened);
     const storeId = storeIdFromAuth(c);
     const productId = c.req.param("productId");
-    const result = await new GlobalCatalogService(db).importToStore(storeId, productId);
+    const result = await new GlobalCatalogService(db).importToStore(
+      storeId,
+      productId,
+      toImportAssignment(parsed.data),
+    );
     const actor = actorFromAuth(c.get("auth"));
     await writeAuditLog(db, {
       ...actor,
@@ -119,6 +131,33 @@ export function registerAdminGlobalCatalogRoutes(app: Hono<AppEnv>) {
     return sendSuccess(c, result, {
       message: SUCCESS_MESSAGES.GLOBAL_PRODUCT_IMPORTED,
       status: HTTP_STATUS.CREATED,
+    });
+  });
+
+  app.patch("/global-catalog/products/:productId/import", async (c) => {
+    const body = await c.req.json().catch(() => null);
+    const parsed = remapImportedProductBodySchema.safeParse(body);
+    if (!parsed.success) throw new ValidationError("Invalid body.", parsed.error.flatten());
+
+    const { db, opened } = await useRequestDb(c);
+    if (opened) scheduleDbClose(c, opened);
+    const storeId = storeIdFromAuth(c);
+    const productId = c.req.param("productId");
+    const result = await new GlobalCatalogService(db).remapStoreCategory(
+      storeId,
+      productId,
+      toImportAssignment(parsed.data),
+    );
+    const actor = actorFromAuth(c.get("auth"));
+    await writeAuditLog(db, {
+      ...actor,
+      storeId,
+      action: AUDIT_ACTIONS.GLOBAL_PRODUCT_CATEGORY_UPDATE,
+      resourceType: "global_product",
+      resourceId: productId,
+    });
+    return sendSuccess(c, result, {
+      message: SUCCESS_MESSAGES.GLOBAL_PRODUCT_CATEGORY_UPDATED,
     });
   });
 

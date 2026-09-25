@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { paginationQuerySchema } from "@/shared/pagination";
+import type { ImportStoreCategoryAssignment } from "./global-catalog.types";
 
 const handleSchema = z
   .string()
@@ -100,6 +101,40 @@ export const listGlobalCategoriesQuerySchema = z.object({
   status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
 });
 
-export const bulkImportGlobalProductsBodySchema = z.object({
-  productIds: z.array(z.string().uuid()).min(1).max(50),
+const newStoreCategorySchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  slug: slugSchema,
 });
+
+export const importStoreCategoryAssignmentSchema = z
+  .object({
+    storeCategoryId: z.string().uuid().optional(),
+    newCategory: newStoreCategorySchema.optional(),
+  })
+  .refine((value) => Boolean(value.storeCategoryId) !== Boolean(value.newCategory), {
+    message: "Provide either storeCategoryId or newCategory.",
+  });
+
+export const importGlobalProductBodySchema = importStoreCategoryAssignmentSchema;
+
+export const remapImportedProductBodySchema = importStoreCategoryAssignmentSchema;
+
+export const bulkImportGlobalProductsBodySchema = z
+  .object({
+    productIds: z.array(z.string().uuid()).min(1).max(50),
+    storeCategoryId: z.string().uuid().optional(),
+    newCategory: newStoreCategorySchema.optional(),
+  })
+  .refine((value) => Boolean(value.storeCategoryId) !== Boolean(value.newCategory), {
+    message: "Provide either storeCategoryId or newCategory.",
+  });
+
+export function toImportAssignment(data: {
+  storeCategoryId?: string;
+  newCategory?: { name: string; slug: string };
+}): ImportStoreCategoryAssignment {
+  if (data.newCategory) {
+    return { newCategory: data.newCategory };
+  }
+  return { storeCategoryId: data.storeCategoryId! };
+}

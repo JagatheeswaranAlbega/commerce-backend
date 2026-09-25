@@ -20,6 +20,7 @@ import {
   type GlobalProductResponse,
   type GlobalProductThumbnail,
   type GlobalVariantResponse,
+  type ImportStoreCategoryAssignment,
   type ListGlobalProductsQuery,
   type UpdateGlobalCategoryInput,
   type UpdateGlobalProductInput,
@@ -32,10 +33,14 @@ export type BulkImportFailure = {
   code: string | null;
 };
 
+export type ImportedProductResult = GlobalProductResponse & {
+  associationId: string;
+  importedAt: string;
+  storeCategoryId: string | null;
+};
+
 export type BulkImportResult = {
-  imported: Array<
-    GlobalProductResponse & { associationId: string; importedAt: string }
-  >;
+  imported: ImportedProductResult[];
   failed: BulkImportFailure[];
   importedCount: number;
   failedCount: number;
@@ -162,6 +167,7 @@ export class GlobalCatalogService {
       ...toGlobalProductResponse(product, {
         ...(storeId ? { imported: Boolean(association) } : {}),
         ...(!storeId ? { importCount: importCounts.get(productId) ?? 0 } : {}),
+        ...(association ? { storeCategoryId: association.storeCategoryId } : {}),
       }),
       variants: variants.map(toGlobalVariantResponse),
       images: images.map(toGlobalImageResponse),
@@ -316,7 +322,117 @@ export class GlobalCatalogService {
 
   // --- Import / remove ---
 
-  async importToStore(storeId: string, globalProductId: string) {
+  async resolveStoreCategory(
+    storeId: string,
+    assignment: ImportStoreCategoryAssignment,
+  ): Promise<string> {
+    if (assignment.newCategory) {
+      const existing = await this.repo.findStoreCategoryBySlug(
+        storeId,
+        assignment.newCategory.slug,
+      );
+      if (existing) {
+        throw new DuplicateResourceError("A store category with this slug already exists.");
+      }
+      const created = await this.repo.createStoreCategory(storeId, assignment.newCategory);
+      return created.id;
+    }
+
+    const category = await this.repo.findStoreCategory(storeId, assignment.storeCategoryId);
+    if (!category) throw new NotFoundError("Store category not found.");
+    return category.id;
+  }
+
+  async importToStore(
+    storeId: string,
+    globalProductId: string,
+    assignment: ImportStoreCategoryAssignment,
+  ): Promise<ImportedProductResult> {
+    const storeCategoryId = await this.resolveStoreCategory(storeId, assignment);
+    return this.importToStoreWithCategory(storeId, globalProductId, storeCategoryId);
+  }
+
+  async importManyToStore(
+    storeId: string,
+    productIds: string[],
+    assignment: ImportStoreCategoryAssignment,
+  ): Promise<BulkImportResult> {
+    const storeCategoryId = await this.resolveStoreCategory(storeId, assignment);
+    const uniqueIds = [...new Set(productIds)];
+    const imported: BulkImportResult["imported"] = [];
+    const failed: BulkImportFailure[] = [];
+
+    for (const productId of uniqueIds) {
+      try {
+        imported.push(await this.importToStoreWithCategory(storeId, productId, storeCategoryId));
+      } catch (error) {
+        if (error instanceof AppError) {
+          failed.push({
+            productId,
+            message: error.message,
+            code: error.code,
+          });
+        } else {
+          failed.push({
+            productId,
+            message: "Import failed.",
+            code: null,
+          });
+        }
+      }
+    }
+
+    return {
+      imported,
+      failed,
+      importedCount: imported.length,
+      failedCount: failed.length,
+    };
+  }
+
+  async remapStoreCategory(
+    storeId: string,
+    globalProductId: string,
+    assignment: ImportStoreCategoryAssignment,
+  ): Promise<ImportedProductResult> {
+    const existing = await this.repo.findAssociation(storeId, globalProductId);
+    if (!existing) {
+      throw new NotFoundError("Global product is not imported into this store.");
+    }
+    const product = await this.repo.findProductById(globalProductId);
+    if (!product) throw new NotFoundError("Global product not found.");
+
+    const storeCategoryId = await this.resolveStoreCategory(storeId, assignment);
+    const association = await this.repo.updateAssociationCategory(
+      storeId,
+      globalProductId,
+      storeCategoryId,
+    );
+    if (!association) {
+      throw new NotFoundError("Global product is not imported into this store.");
+    }
+
+    return {
+      ...toGlobalProductResponse(product, {
+        imported: true,
+        storeCategoryId: association.storeCategoryId,
+      }),
+      associationId: association.id,
+      importedAt: association.importedAt.toISOString(),
+      storeCategoryId: association.storeCategoryId,
+    };
+  }
+
+  async removeFromStore(storeId: string, globalProductId: string): Promise<void> {
+    const deleted = await this.repo.removeImport(storeId, globalProductId);
+    if (!deleted) throw new NotFoundError("Global product is not imported into this store.");
+  }
+
+  private async importToStoreWithCategory(
+    storeId: string,
+    globalProductId: string,
+    storeCategoryId: string,
+  ): Promise<ImportedProductResult> {
     const product = await this.repo.findProductById(globalProductId);
     if (!product) throw new NotFoundError("Global product not found.");
     if (product.status !== "ACTIVE") {
@@ -348,51 +464,18 @@ export class GlobalCatalogService {
       storeId,
       globalProductId,
       variants.map((v) => v.id),
+      storeCategoryId,
     );
 
     return {
-      ...toGlobalProductResponse(product, { imported: true }),
+      ...toGlobalProductResponse(product, {
+        imported: true,
+        storeCategoryId: association.storeCategoryId,
+      }),
       associationId: association.id,
       importedAt: association.importedAt.toISOString(),
+      storeCategoryId: association.storeCategoryId,
     };
-  }
-
-  async importManyToStore(storeId: string, productIds: string[]): Promise<BulkImportResult> {
-    const uniqueIds = [...new Set(productIds)];
-    const imported: BulkImportResult["imported"] = [];
-    const failed: BulkImportFailure[] = [];
-
-    for (const productId of uniqueIds) {
-      try {
-        imported.push(await this.importToStore(storeId, productId));
-      } catch (error) {
-        if (error instanceof AppError) {
-          failed.push({
-            productId,
-            message: error.message,
-            code: error.code,
-          });
-        } else {
-          failed.push({
-            productId,
-            message: "Import failed.",
-            code: null,
-          });
-        }
-      }
-    }
-
-    return {
-      imported,
-      failed,
-      importedCount: imported.length,
-      failedCount: failed.length,
-    };
-  }
-
-  async removeFromStore(storeId: string, globalProductId: string): Promise<void> {
-    const deleted = await this.repo.removeImport(storeId, globalProductId);
-    if (!deleted) throw new NotFoundError("Global product is not imported into this store.");
   }
 }
 

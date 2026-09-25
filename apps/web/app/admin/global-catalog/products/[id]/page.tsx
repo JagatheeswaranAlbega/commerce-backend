@@ -28,11 +28,16 @@ import {
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { ApiError } from "@/lib/api"
+import { ImportCategoryDialog } from "@/components/admin/global-catalog/import-category-dialog"
 import {
   getAdminGlobalProduct,
   importAdminGlobalProduct,
+  listAdminGlobalCategories,
+  remapAdminGlobalProductCategory,
   removeAdminGlobalProductImport,
+  type ImportStoreCategoryAssignment,
 } from "@/lib/api/admin/global-catalog"
+import { listAdminCategories } from "@/lib/api/admin/categories"
 import {
   createPlatformGlobalVariant,
   deletePlatformGlobalProduct,
@@ -47,7 +52,14 @@ import {
   type GlobalProductStatus,
   type GlobalVariant,
 } from "@/lib/api/platform/global-catalog"
+import {
+  globalCategoryById,
+  globalCategoryLabel,
+  globalCategorySelectOptions,
+  topLevelCategoryId,
+} from "@/lib/global-category-label"
 import { formatPaise } from "@/lib/money"
+import { appToast } from "@/lib/toast"
 import { paiseToRupeesInput, rupeesToPaise } from "@/lib/money-input"
 import { hasPermission, isPlatformScope } from "@/lib/permissions"
 
@@ -473,6 +485,9 @@ function PlatformGlobalProductDetail({ productId }: { productId: string }) {
   }
 
   const categories = categoriesQuery.data ?? []
+  const categoryById = globalCategoryById(categories)
+  const categoryOptions = globalCategorySelectOptions(categories)
+  const selectedCategoryId = topLevelCategoryId(categoryId, categoryById)
   const variants = productQuery.data.variants ?? []
   const images = productQuery.data.images ?? []
   const importCount = productQuery.data.importCount ?? 0
@@ -620,14 +635,14 @@ function PlatformGlobalProductDetail({ productId }: { productId: string }) {
               <select
                 id="categoryId"
                 className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-                value={categoryId}
+                value={selectedCategoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
                 disabled={isPending}
               >
                 <option value="">None</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
+                {categoryOptions.map((category) => (
+                  <option key={category.value} value={category.value}>
+                    {category.label}
                   </option>
                 ))}
               </select>
@@ -847,15 +862,53 @@ function StoreGlobalProductDetail({ productId }: { productId: string }) {
     queryKey: ["admin", "global-product", productId],
     queryFn: () => getAdminGlobalProduct(productId),
   })
+  const globalCategoriesQuery = useQuery({
+    queryKey: ["admin", "global-categories"],
+    queryFn: () => listAdminGlobalCategories({ status: "ACTIVE" }),
+  })
+  const storeCategoriesQuery = useQuery({
+    queryKey: ["admin", "categories"],
+    queryFn: () => listAdminCategories({ pageSize: 100 }),
+  })
+  const [importOpen, setImportOpen] = useState(false)
+  const [remapOpen, setRemapOpen] = useState(false)
 
   const importMutation = useMutation({
-    mutationFn: () => importAdminGlobalProduct(productId),
+    mutationFn: (assignment: ImportStoreCategoryAssignment) =>
+      importAdminGlobalProduct(productId, assignment),
     onSuccess: async () => {
+      setImportOpen(false)
+      appToast.success("Product imported into your store")
       await queryClient.invalidateQueries({
         queryKey: ["admin", "global-product", productId],
       })
       await queryClient.invalidateQueries({ queryKey: ["admin", "global-products"] })
       await queryClient.invalidateQueries({ queryKey: ["admin", "inventory"] })
+      await queryClient.invalidateQueries({ queryKey: ["admin", "categories"] })
+      await queryClient.invalidateQueries({ queryKey: ["admin", "products"] })
+    },
+    onError: (error) => {
+      appToast.error(error instanceof Error ? error.message : "Import failed.")
+    },
+  })
+
+  const remapMutation = useMutation({
+    mutationFn: (assignment: ImportStoreCategoryAssignment) =>
+      remapAdminGlobalProductCategory(productId, assignment),
+    onSuccess: async () => {
+      setRemapOpen(false)
+      appToast.success("Store category updated")
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "global-product", productId],
+      })
+      await queryClient.invalidateQueries({ queryKey: ["admin", "global-products"] })
+      await queryClient.invalidateQueries({ queryKey: ["admin", "categories"] })
+      await queryClient.invalidateQueries({ queryKey: ["admin", "products"] })
+    },
+    onError: (error) => {
+      appToast.error(
+        error instanceof Error ? error.message : "Failed to update category."
+      )
     },
   })
 
@@ -895,7 +948,16 @@ function StoreGlobalProductDetail({ productId }: { productId: string }) {
 
   const product = productQuery.data
   const variants = product.variants ?? []
-  const isPending = importMutation.isPending || removeMutation.isPending
+  const isPending =
+    importMutation.isPending || remapMutation.isPending || removeMutation.isPending
+  const globalCategories = globalCategoriesQuery.data ?? []
+  const globalCategoryMap = globalCategoryById(globalCategories)
+  const platformCategory = product.categoryId
+    ? globalCategoryMap.get(product.categoryId)
+    : undefined
+  const storeCategory = storeCategoriesQuery.data?.data.find(
+    (category) => category.id === product.storeCategoryId
+  )
 
   return (
     <div className="flex flex-col gap-4">
@@ -917,17 +979,26 @@ function StoreGlobalProductDetail({ productId }: { productId: string }) {
               )}
               {canImport ? (
                 product.imported ? (
-                  <Button
-                    variant="destructive"
-                    disabled={isPending}
-                    onClick={() => removeMutation.mutate()}
-                  >
-                    Remove from My Store
-                  </Button>
+                  <>
+                    <Button
+                      variant="outline"
+                      disabled={isPending}
+                      onClick={() => setRemapOpen(true)}
+                    >
+                      Change category
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      disabled={isPending}
+                      onClick={() => removeMutation.mutate()}
+                    >
+                      Remove from My Store
+                    </Button>
+                  </>
                 ) : (
                   <Button
                     disabled={product.status !== "ACTIVE" || isPending}
-                    onClick={() => importMutation.mutate()}
+                    onClick={() => setImportOpen(true)}
                   >
                     Import to My Store
                   </Button>
@@ -971,9 +1042,24 @@ function StoreGlobalProductDetail({ productId }: { productId: string }) {
             <ProductStatusBadge status={product.status} />
           </ProductSectionCard>
           <ProductSectionCard title="Organize">
-            <p className="text-sm text-muted-foreground">
-              Category and pricing are set by the platform.
-            </p>
+            <dl className="grid gap-3 text-sm">
+              <div>
+                <dt className="text-muted-foreground">Platform category</dt>
+                <dd>
+                  {platformCategory
+                    ? globalCategoryLabel(platformCategory, globalCategoryMap)
+                    : "—"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Store category</dt>
+                <dd>
+                  {product.imported
+                    ? (storeCategory?.name ?? "Unassigned")
+                    : "Assign when importing"}
+                </dd>
+              </div>
+            </dl>
           </ProductSectionCard>
         </div>
 
@@ -1042,6 +1128,29 @@ function StoreGlobalProductDetail({ productId }: { productId: string }) {
           ) : null}
         </ProductSectionCard>
       </div>
+
+      <ImportCategoryDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        title="Import to My Store"
+        description="Choose a store category so this product appears in your shop navigation."
+        confirmLabel="Import product"
+        pending={importMutation.isPending}
+        defaultCategoryName={platformCategory?.name ?? ""}
+        defaultCategorySlug={platformCategory?.slug ?? ""}
+        onConfirm={(assignment) => importMutation.mutate(assignment)}
+      />
+      <ImportCategoryDialog
+        open={remapOpen}
+        onOpenChange={setRemapOpen}
+        title="Change store category"
+        description="Move this imported product to another store category, or create a new one."
+        confirmLabel="Update category"
+        pending={remapMutation.isPending}
+        defaultCategoryName={platformCategory?.name ?? ""}
+        defaultCategorySlug={platformCategory?.slug ?? ""}
+        onConfirm={(assignment) => remapMutation.mutate(assignment)}
+      />
     </div>
   )
 }

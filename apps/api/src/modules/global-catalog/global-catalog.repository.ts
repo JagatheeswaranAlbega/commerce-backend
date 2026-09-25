@@ -1,6 +1,7 @@
 import { and, count, desc, eq, ilike, inArray, sql } from "drizzle-orm";
 import type { Database } from "@/db/client";
 import { cartLineItems } from "@/db/schema/cart-line-items";
+import { categories } from "@/db/schema/categories";
 import { globalCategories } from "@/db/schema/global-categories";
 import { globalProductImages } from "@/db/schema/global-product-images";
 import { globalProductVariants } from "@/db/schema/global-product-variants";
@@ -17,6 +18,7 @@ import type {
   GlobalImageRecord,
   GlobalProductRecord,
   GlobalVariantRecord,
+  ImportedGlobalProductRecord,
   ListGlobalProductsQuery,
   StoreGlobalProductRecord,
   UpdateGlobalCategoryInput,
@@ -83,10 +85,21 @@ function toAssociation(row: typeof storeGlobalProducts.$inferSelect): StoreGloba
     id: row.id,
     storeId: row.storeId,
     globalProductId: row.globalProductId,
+    storeCategoryId: row.storeCategoryId,
     status: row.status,
     importedAt: row.importedAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
+  };
+}
+
+function toImportedProduct(
+  row: typeof globalProducts.$inferSelect,
+  storeCategoryId: string | null,
+): ImportedGlobalProductRecord {
+  return {
+    ...toProduct(row),
+    storeCategoryId,
   };
 }
 
@@ -158,6 +171,14 @@ export class GlobalCatalogRepository {
 
   // --- Products ---
 
+  async listChildCategoryIds(parentId: string): Promise<string[]> {
+    const rows = await this.db.query.globalCategories.findMany({
+      where: eq(globalCategories.parentId, parentId),
+      columns: { id: true },
+    });
+    return rows.map((row) => row.id);
+  }
+
   async listProducts(query: {
     limit: number;
     offset: number;
@@ -167,7 +188,10 @@ export class GlobalCatalogRepository {
   }): Promise<{ items: GlobalProductRecord[]; total: number }> {
     const conditions = [];
     if (query.status) conditions.push(eq(globalProducts.status, query.status));
-    if (query.categoryId) conditions.push(eq(globalProducts.categoryId, query.categoryId));
+    if (query.categoryId) {
+      const childIds = await this.listChildCategoryIds(query.categoryId);
+      conditions.push(inArray(globalProducts.categoryId, [query.categoryId, ...childIds]));
+    }
     if (query.q) conditions.push(ilike(globalProducts.title, `%${query.q}%`));
     const where = conditions.length > 0 ? and(...conditions) : undefined;
 
@@ -446,12 +470,89 @@ export class GlobalCatalogRepository {
     return row ? toAssociation(row) : null;
   }
 
-  async listImportedProductIds(storeId: string): Promise<Set<string>> {
+  async listImportedProductIds(
+    storeId: string,
+    opts?: { storeCategoryId?: string },
+  ): Promise<Set<string>> {
+    const conditions = [eq(storeGlobalProducts.storeId, storeId)];
+    if (opts?.storeCategoryId) {
+      conditions.push(eq(storeGlobalProducts.storeCategoryId, opts.storeCategoryId));
+    }
     const rows = await this.db
       .select({ id: storeGlobalProducts.globalProductId })
       .from(storeGlobalProducts)
-      .where(eq(storeGlobalProducts.storeId, storeId));
+      .where(and(...conditions));
     return new Set(rows.map((r) => r.id));
+  }
+
+  async listImportedCategoryMap(storeId: string): Promise<Map<string, string | null>> {
+    const rows = await this.db
+      .select({
+        globalProductId: storeGlobalProducts.globalProductId,
+        storeCategoryId: storeGlobalProducts.storeCategoryId,
+      })
+      .from(storeGlobalProducts)
+      .where(eq(storeGlobalProducts.storeId, storeId));
+    return new Map(rows.map((row) => [row.globalProductId, row.storeCategoryId]));
+  }
+
+  async findStoreCategory(
+    storeId: string,
+    categoryId: string,
+  ): Promise<{ id: string; storeId: string; slug: string } | null> {
+    const row = await this.db.query.categories.findFirst({
+      where: and(eq(categories.id, categoryId), eq(categories.storeId, storeId)),
+      columns: { id: true, storeId: true, slug: true },
+    });
+    return row ?? null;
+  }
+
+  async findStoreCategoryBySlug(
+    storeId: string,
+    slug: string,
+  ): Promise<{ id: string } | null> {
+    const row = await this.db.query.categories.findFirst({
+      where: and(eq(categories.storeId, storeId), eq(categories.slug, slug)),
+      columns: { id: true },
+    });
+    return row ?? null;
+  }
+
+  async createStoreCategory(
+    storeId: string,
+    input: { name: string; slug: string },
+  ): Promise<{ id: string }> {
+    const [row] = await this.db
+      .insert(categories)
+      .values({
+        storeId,
+        name: input.name,
+        slug: input.slug,
+        status: "ACTIVE",
+      })
+      .returning({ id: categories.id });
+    return row!;
+  }
+
+  async updateAssociationCategory(
+    storeId: string,
+    globalProductId: string,
+    storeCategoryId: string,
+  ): Promise<StoreGlobalProductRecord | null> {
+    const [row] = await this.db
+      .update(storeGlobalProducts)
+      .set({
+        storeCategoryId,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(storeGlobalProducts.storeId, storeId),
+          eq(storeGlobalProducts.globalProductId, globalProductId),
+        ),
+      )
+      .returning();
+    return row ? toAssociation(row) : null;
   }
 
   async findLocalProductByHandle(
@@ -469,6 +570,7 @@ export class GlobalCatalogRepository {
     storeId: string,
     globalProductId: string,
     variantIds: string[],
+    storeCategoryId: string,
   ): Promise<StoreGlobalProductRecord> {
     return this.db.transaction(async (tx) => {
       const [row] = await tx
@@ -476,6 +578,7 @@ export class GlobalCatalogRepository {
         .values({
           storeId,
           globalProductId,
+          storeCategoryId,
           status: "ACTIVE",
         })
         .returning();
@@ -555,19 +658,24 @@ export class GlobalCatalogRepository {
       categoryId?: string;
       q?: string;
     },
-  ): Promise<{ items: GlobalProductRecord[]; total: number }> {
+  ): Promise<{ items: ImportedGlobalProductRecord[]; total: number }> {
     const conditions = [
       eq(storeGlobalProducts.storeId, storeId),
       eq(storeGlobalProducts.status, "ACTIVE"),
       eq(globalProducts.status, "ACTIVE"),
     ];
-    if (opts.categoryId) conditions.push(eq(globalProducts.categoryId, opts.categoryId));
+    if (opts.categoryId) {
+      conditions.push(eq(storeGlobalProducts.storeCategoryId, opts.categoryId));
+    }
     if (opts.q) conditions.push(ilike(globalProducts.title, `%${opts.q}%`));
 
     const where = and(...conditions);
     const [rows, totalRow] = await Promise.all([
       this.db
-        .select({ product: globalProducts })
+        .select({
+          product: globalProducts,
+          storeCategoryId: storeGlobalProducts.storeCategoryId,
+        })
         .from(storeGlobalProducts)
         .innerJoin(globalProducts, eq(storeGlobalProducts.globalProductId, globalProducts.id))
         .where(where)
@@ -581,7 +689,7 @@ export class GlobalCatalogRepository {
         .where(where),
     ]);
     return {
-      items: rows.map((r) => toProduct(r.product)),
+      items: rows.map((r) => toImportedProduct(r.product, r.storeCategoryId)),
       total: Number(totalRow[0]?.total ?? 0),
     };
   }
@@ -589,9 +697,12 @@ export class GlobalCatalogRepository {
   async findImportedActiveByHandle(
     storeId: string,
     handle: string,
-  ): Promise<GlobalProductRecord | null> {
+  ): Promise<ImportedGlobalProductRecord | null> {
     const [row] = await this.db
-      .select({ product: globalProducts })
+      .select({
+        product: globalProducts,
+        storeCategoryId: storeGlobalProducts.storeCategoryId,
+      })
       .from(storeGlobalProducts)
       .innerJoin(globalProducts, eq(storeGlobalProducts.globalProductId, globalProducts.id))
       .where(
@@ -603,12 +714,12 @@ export class GlobalCatalogRepository {
         ),
       )
       .limit(1);
-    return row ? toProduct(row.product) : null;
+    return row ? toImportedProduct(row.product, row.storeCategoryId) : null;
   }
 
   async listActiveImportedCategoryIds(storeId: string): Promise<string[]> {
     const rows = await this.db
-      .selectDistinct({ categoryId: globalProducts.categoryId })
+      .selectDistinct({ categoryId: storeGlobalProducts.storeCategoryId })
       .from(storeGlobalProducts)
       .innerJoin(globalProducts, eq(storeGlobalProducts.globalProductId, globalProducts.id))
       .where(
@@ -616,7 +727,7 @@ export class GlobalCatalogRepository {
           eq(storeGlobalProducts.storeId, storeId),
           eq(storeGlobalProducts.status, "ACTIVE"),
           eq(globalProducts.status, "ACTIVE"),
-          sql`${globalProducts.categoryId} is not null`,
+          sql`${storeGlobalProducts.storeCategoryId} is not null`,
         ),
       );
     return rows.map((r) => r.categoryId!).filter(Boolean);

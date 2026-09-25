@@ -31,44 +31,28 @@ export class ProductService {
   async listForStore(storeId: string, query: ListStoreProductsQuery) {
     const offset = (query.page - 1) * query.pageSize;
 
-    // Store category filter only applies to local products.
-    if (query.categoryId) {
-      const result = await this.products.listByStore(storeId, {
-        limit: query.pageSize,
-        offset,
-        status: query.status,
-        categoryId: query.categoryId,
-        q: query.q,
-      });
-      return {
-        items: result.items.map((item) => ({
-          ...toProductResponse(item),
-          source: "STORE" as const,
-          platformManaged: false,
-        })),
-        total: result.total,
-        page: query.page,
-        pageSize: query.pageSize,
-      };
-    }
-
     const local = await this.products.listByStore(storeId, {
       limit: 500,
       offset: 0,
       status: query.status,
+      categoryId: query.categoryId,
       q: query.q,
     });
 
-    const allImportedIds = await this.globals.listImportedProductIds(storeId);
+    const importedIds = await this.globals.listImportedProductIds(
+      storeId,
+      query.categoryId ? { storeCategoryId: query.categoryId } : undefined,
+    );
+    const categoryMap = await this.globals.listImportedCategoryMap(storeId);
     let globalItems: Awaited<ReturnType<GlobalCatalogRepository["listProducts"]>>["items"] = [];
-    if (allImportedIds.size > 0) {
+    if (importedIds.size > 0) {
       const listed = await this.globals.listProducts({
         limit: 500,
         offset: 0,
         status: query.status,
         q: query.q,
       });
-      globalItems = listed.items.filter((p) => allImportedIds.has(p.id));
+      globalItems = listed.items.filter((p) => importedIds.has(p.id));
     }
 
     const localItems: ProductResponse[] = local.items.map((item) => ({
@@ -80,7 +64,7 @@ export class ProductService {
     const globalResponses: ProductResponse[] = globalItems.map((product) => ({
       id: product.id,
       storeId,
-      categoryId: product.categoryId,
+      categoryId: categoryMap.get(product.id) ?? null,
       title: product.title,
       handle: product.handle,
       shortDescription: product.shortDescription,
@@ -225,7 +209,7 @@ export class ProductService {
         globalItems.push({
           id: product.id,
           storeId,
-          categoryId: product.categoryId,
+          categoryId: product.storeCategoryId,
           title: product.title,
           handle: product.handle,
           shortDescription: product.shortDescription,
@@ -295,7 +279,7 @@ export class ProductService {
     return {
       id: global.id,
       storeId,
-      categoryId: global.categoryId,
+      categoryId: association.storeCategoryId,
       title: global.title,
       handle: global.handle,
       shortDescription: global.shortDescription,
@@ -334,7 +318,7 @@ export class ProductService {
     return {
       id: global.id,
       storeId,
-      categoryId: global.categoryId,
+      categoryId: global.storeCategoryId,
       title: global.title,
       handle: global.handle,
       shortDescription: global.shortDescription,
